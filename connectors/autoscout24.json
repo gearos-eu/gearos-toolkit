@@ -1,0 +1,8 @@
+{
+  "name": "autoscout24",
+  "base_url": "https://www.autoscout24.de/lst",
+  "country_filter": "cy=D",
+  "offer_types": "offer=J,D",
+  "sort": "sort=price&desc=0",
+  "notes": "Fallback when mobile.de is unavailable or returns CAPTCHA"
+}

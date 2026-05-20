@@ -1,0 +1,7 @@
+{
+  "name": "Google Sheets",
+  "crm_url": "",
+  "crm_tab_dealers": "komplet new",
+  "crm_tab_transport": "Transporty",
+  "notes": "Fill in crm_url with your Google Sheets URL"
+}

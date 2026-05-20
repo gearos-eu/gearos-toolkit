@@ -1,0 +1,22 @@
+{
+  "_instructions": "Connect GearOS to your inventory database. Supported types: google_sheets, notion, airtable, xlsx_local.",
+
+  "type": "google_sheets",
+  "url": "",
+  "sheet_name": "",
+  "crm_file_path": "",
+
+  "b2b_contacts": {
+    "type": "xlsx_local",
+    "path": "C:\\Users\\Juraj\\Desktop\\Claude Cowork\\Projects\\B2B automatization\\B2B_kontakty_komplet.xlsx",
+    "sheet_name": "komplet new"
+  },
+
+  "permanent_exclude_emails": [
+    "kevin.kantner@kt-germany.de",
+    "natalia.kulminska@kt-germany.de",
+    "diogo.oliveira@kt-germany.de",
+    "nils.scheider@kt-germany.de",
+    "arvydas.sarnauskas@hertz.lt"
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "name": "Gmail",
+  "compose_url": "https://mail.google.com/mail/u/0/?view=cm&fs=1",
+  "notes": "Use Chrome JavaScript injection for draft creation. Gmail API unreliable for non-ASCII characters.",
+  "unicode_escape_required": true,
+  "chars_to_escape": {
+    "ä": "\\u00e4", "Ä": "\\u00c4",
+    "ö": "\\u00f6", "Ö": "\\u00d6",
+    "ü": "\\u00fc", "Ü": "\\u00dc",
+    "ß": "\\u00df",
+    "€": "\\u20ac"
+  }
+}

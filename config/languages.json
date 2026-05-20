@@ -1,0 +1,7 @@
+{
+  "_instructions": "Set your active languages. Skills will generate emails and documents in these languages.",
+
+  "primary": "de",
+  "active": ["de", "en", "sk", "cs"],
+  "available": ["en", "de", "cs", "sk", "pl", "hu", "ro", "fr", "it"]
+}
