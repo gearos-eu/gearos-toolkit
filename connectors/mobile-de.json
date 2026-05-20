@@ -1,0 +1,10 @@
+{
+  "name": "mobile.de",
+  "base_url": "https://suchen.mobile.de/fahrzeuge/search.html",
+  "country_filter": "cn=DE",
+  "no_accident": "dam=false",
+  "vehicle_type": "s=Car&vc=Car",
+  "sort": "sort=price",
+  "page_size": "pageSize=25",
+  "notes": "URL params for makeId/modelId must be resolved via browser UI — do not hardcode IDs"
+}

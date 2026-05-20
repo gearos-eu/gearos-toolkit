@@ -1,0 +1,21 @@
+# Private config — never commit
+config/license.json
+.gearos-private/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# Generated files
+*.pdf
+*_clean_*.xlsx
+competitors_*.xlsx
+offer_*.pdf
+
+# Node (if added later)
+node_modules/

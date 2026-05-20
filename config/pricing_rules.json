@@ -1,0 +1,29 @@
+{
+  "_instructions": "Set your purchasing budget, margin targets, and cost parameters.",
+
+  "purchase_budget": {
+    "min_eur": 15000,
+    "max_eur": 30000
+  },
+  "max_mileage_km": 60000,
+  "max_age_years": 3,
+  "min_target_margin_eur": 3000,
+  "transport_cost_eur": 1000,
+  "vat_rate": 0.23,
+
+  "segment_markups": {
+    "_instructions": "Expected DE→local price markup per segment (as decimal, e.g. 0.15 = 15%)",
+    "premium_sedan_suv": 0.22,
+    "ev_phev": 0.175,
+    "c_suv_mid": 0.15,
+    "compact_mass": 0.10,
+    "small_cars": 0.07
+  },
+
+  "red_flags": {
+    "exclude_taxi": true,
+    "exclude_rental": true,
+    "exclude_accident_history": true,
+    "max_previous_owners": 2
+  }
+}

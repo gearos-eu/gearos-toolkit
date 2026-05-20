@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GearOS — AI toolkit for automotive dealers</title>
+  <meta name="description" content="8 plug-and-play AI skills for EU car dealers. Scan procurement markets, monitor competitor pricing, automate B2B outreach. Runs in Claude Code.">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --black: #0f0f0f;
+      --white: #ffffff;
+      --gray: #6b7280;
+      --light: #f5f5f5;
+      --accent: #2563eb;
+      --accent-light: #eff6ff;
+      --border: #e5e7eb;
+      --radius: 10px;
+      --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+
+    body {
+      font-family: var(--font);
+      color: var(--black);
+      background: var(--white);
+      line-height: 1.6;
+    }
+
+    /* NAV */
+    nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 40px;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      background: white;
+      z-index: 10;
+    }
+    .logo { font-weight: 700; font-size: 1.25rem; letter-spacing: -0.5px; }
+    .logo span { color: var(--accent); }
+    nav a { text-decoration: none; color: var(--gray); font-size: 0.9rem; margin-left: 28px; }
+    nav a:hover { color: var(--black); }
+    .nav-cta {
+      background: var(--black);
+      color: white !important;
+      padding: 8px 18px;
+      border-radius: 6px;
+      font-weight: 500;
+    }
+    .nav-cta:hover { background: #333 !important; }
+
+    /* SECTIONS */
+    section { padding: 80px 40px; max-width: 1100px; margin: 0 auto; }
+
+    /* HERO */
+    .hero { text-align: center; padding-top: 100px; padding-bottom: 80px; }
+    .hero-badge {
+      display: inline-block;
+      background: var(--accent-light);
+      color: var(--accent);
+      font-size: 0.8rem;
+      font-weight: 600;
+      padding: 4px 12px;
+      border-radius: 20px;
+      margin-bottom: 24px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+    h1 {
+      font-size: clamp(2rem, 5vw, 3.5rem);
+      font-weight: 800;
+      line-height: 1.15;
+      letter-spacing: -1px;
+      margin-bottom: 24px;
+    }
+    h1 em { font-style: normal; color: var(--accent); }
+    .hero p {
+      font-size: 1.15rem;
+      color: var(--gray);
+      max-width: 560px;
+      margin: 0 auto 40px;
+    }
+    .hero-actions { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+    .btn-primary {
+      background: var(--black);
+      color: white;
+      padding: 14px 28px;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 0.95rem;
+      transition: background 0.15s;
+    }
+    .btn-primary:hover { background: #333; }
+    .btn-secondary {
+      background: var(--light);
+      color: var(--black);
+      padding: 14px 28px;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 500;
+      font-size: 0.95rem;
+    }
+    .btn-secondary:hover { background: #e8e8e8; }
+
+    /* SOCIAL PROOF */
+    .proof {
+      text-align: center;
+      font-size: 0.85rem;
+      color: var(--gray);
+      margin-top: 32px;
+    }
+
+    /* HOW IT WORKS */
+    .how { background: var(--light); border-radius: 16px; padding: 60px 40px; }
+    h2 { font-size: 2rem; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 16px; }
+    .sub { color: var(--gray); margin-bottom: 48px; font-size: 1.05rem; }
+    .steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 32px; }
+    .step { display: flex; flex-direction: column; gap: 12px; }
+    .step-num {
+      width: 36px; height: 36px;
+      background: var(--black);
+      color: white;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: 0.9rem;
+    }
+    .step h3 { font-size: 1rem; font-weight: 600; }
+    .step p { font-size: 0.9rem; color: var(--gray); }
+
+    /* SKILLS GRID */
+    .skills-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 20px;
+      margin-top: 48px;
+    }
+    .skill-card {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      transition: box-shadow 0.15s;
+    }
+    .skill-card:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+    .skill-icon { font-size: 1.5rem; margin-bottom: 12px; }
+    .skill-card h3 { font-size: 0.95rem; font-weight: 600; margin-bottom: 8px; }
+    .skill-card p { font-size: 0.875rem; color: var(--gray); }
+    .tier-badge {
+      display: inline-block;
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 4px;
+      margin-top: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+    .starter { background: #f0fdf4; color: #16a34a; }
+    .pro { background: #eff6ff; color: #2563eb; }
+
+    /* PRICING */
+    .pricing-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 24px;
+      margin-top: 48px;
+    }
+    .plan {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 32px;
+    }
+    .plan.featured {
+      border-color: var(--black);
+      border-width: 2px;
+      position: relative;
+    }
+    .plan-label {
+      position: absolute;
+      top: -12px;
+      left: 24px;
+      background: var(--black);
+      color: white;
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 3px 12px;
+      border-radius: 20px;
+    }
+    .plan-name { font-size: 1.1rem; font-weight: 700; margin-bottom: 8px; }
+    .plan-price { font-size: 2.2rem; font-weight: 800; letter-spacing: -1px; margin-bottom: 4px; }
+    .plan-price span { font-size: 1rem; font-weight: 400; color: var(--gray); }
+    .plan-desc { font-size: 0.875rem; color: var(--gray); margin-bottom: 24px; }
+    .plan ul { list-style: none; display: flex; flex-direction: column; gap: 10px; margin-bottom: 28px; }
+    .plan li { font-size: 0.875rem; display: flex; gap: 8px; align-items: flex-start; }
+    .plan li::before { content: "✓"; color: var(--accent); font-weight: 700; flex-shrink: 0; }
+    .plan-btn {
+      display: block;
+      text-align: center;
+      padding: 12px;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+    .plan-btn-primary { background: var(--black); color: white; }
+    .plan-btn-primary:hover { background: #333; }
+    .plan-btn-secondary { background: var(--light); color: var(--black); }
+    .plan-btn-secondary:hover { background: #e8e8e8; }
+
+    /* TERMINAL */
+    .terminal {
+      background: #1a1a1a;
+      border-radius: 10px;
+      padding: 24px 28px;
+      font-family: 'Courier New', monospace;
+      font-size: 0.875rem;
+      color: #e2e8f0;
+      margin-top: 48px;
+      max-width: 680px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    .terminal-header {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+    .dot { width: 12px; height: 12px; border-radius: 50%; }
+    .dot-red { background: #ff5f57; }
+    .dot-yellow { background: #febc2e; }
+    .dot-green { background: #28c840; }
+    .t-gray { color: #6b7280; }
+    .t-green { color: #4ade80; }
+    .t-blue { color: #60a5fa; }
+    .t-white { color: #f9fafb; }
+    .t-line { margin: 4px 0; }
+
+    /* FAQ */
+    .faq-list { display: flex; flex-direction: column; gap: 0; margin-top: 48px; }
+    .faq-item { border-bottom: 1px solid var(--border); padding: 24px 0; }
+    .faq-item h3 { font-size: 1rem; font-weight: 600; margin-bottom: 10px; }
+    .faq-item p { font-size: 0.9rem; color: var(--gray); }
+
+    /* FOOTER */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 40px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+    footer p { font-size: 0.875rem; color: var(--gray); }
+    footer a { color: var(--gray); text-decoration: none; margin-left: 20px; font-size: 0.875rem; }
+    footer a:hover { color: var(--black); }
+
+    @media (max-width: 640px) {
+      nav { padding: 16px 20px; }
+      nav a:not(.nav-cta) { display: none; }
+      section { padding: 60px 20px; }
+      .how { padding: 40px 24px; }
+      footer { padding: 32px 20px; flex-direction: column; align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="logo">Gear<span>OS</span></div>
+  <div>
+    <a href="#skills">Skills</a>
+    <a href="#pricing">Pricing</a>
+    <a href="https://github.com/gearos/gearos-toolkit">GitHub</a>
+    <a href="https://github.com/gearos/gearos-toolkit" class="nav-cta">Get started</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-badge">Claude Plugin · EU Automotive</div>
+  <h1>AI skills for<br><em>car dealers</em><br>who mean business.</h1>
+  <p>8 plug-and-play Claude skills. Scan procurement markets, monitor competitor pricing, automate B2B outreach — all configured with your own data.</p>
+  <div class="hero-actions">
+    <a href="https://github.com/gearos/gearos-toolkit" class="btn-primary">Get GearOS free →</a>
+    <a href="#skills" class="btn-secondary">See all skills</a>
+  </div>
+  <p class="proof">Works with mobile.de · AutoScout24 · Gmail · LinkedIn · Excel</p>
+</section>
+
+<!-- TERMINAL DEMO -->
+<section style="padding-top: 0;">
+  <div class="terminal">
+    <div class="terminal-header">
+      <div class="dot dot-red"></div>
+      <div class="dot dot-yellow"></div>
+      <div class="dot dot-green"></div>
+    </div>
+    <div class="t-line"><span class="t-gray">You:</span> <span class="t-white">scan mobile.de for BMW 3er diesel</span></div>
+    <div class="t-line" style="margin-top: 12px;"><span class="t-green">GearOS:</span> <span class="t-white">Scanning... 559 listings found. Filtering by your criteria.</span></div>
+    <div class="t-line"><span class="t-gray">─────────────────────────────────────</span></div>
+    <div class="t-line"><span class="t-green">✅</span> <span class="t-blue">BMW 320d xDrive</span> <span class="t-white">· 28.900€ · EZ 12/2023 · 51.340 km</span></div>
+    <div class="t-line"><span class="t-gray">   Unfallfrei · Automobile Oldenburg GbR</span></div>
+    <div class="t-line"><span class="t-gray">   Estimated margin: ~5.358€ at SK retail 35.258€</span></div>
+    <div class="t-line" style="margin-top: 8px;"><span class="t-gray">─────────────────────────────────────</span></div>
+    <div class="t-line"><span class="t-gray">1 recommend · 0 OK · 22 excluded</span></div>
+    <div class="t-line" style="margin-top: 12px;"><span class="t-gray">Generate B2B outreach for this listing? (yes / skip)</span></div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section>
+  <div class="how">
+    <h2>How it works</h2>
+    <p class="sub">GearOS runs as a Claude plugin. No SaaS dashboard, no new accounts — it runs where you already work.</p>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <h3>Install</h3>
+        <p>Clone the repo, fill in 3 config files with your dealership data. Takes under 10 minutes.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <h3>Configure</h3>
+        <p>Set your buying budget, target margin, languages, and communication style. No code required.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <h3>Talk to it</h3>
+        <p>Open Claude Code and type in plain language. GearOS picks the right skill automatically.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <h3>Stay in control</h3>
+        <p>Every email draft, price offer, and outreach requires your explicit approval. Nothing auto-sends.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SKILLS -->
+<section id="skills">
+  <h2>8 skills. One toolkit.</h2>
+  <p class="sub">Each skill reads your config automatically — no re-entering data between tasks.</p>
+  <div class="skills-grid">
+    <div class="skill-card">
+      <div class="skill-icon">🔍</div>
+      <h3>Car Listing Scanner</h3>
+      <p>Scans mobile.de for vehicles matching your buying criteria. Scores each listing and estimates your margin.</p>
+      <span class="tier-badge starter">Starter</span>
+    </div>
+    <div class="skill-card">
+      <div class="skill-icon">📊</div>
+      <h3>Competitor Pricing Monitor</h3>
+      <p>Finds German dealers selling the same model at a higher price. Identifies your best B2B outreach targets.</p>
+      <span class="tier-badge pro">Pro</span>
+    </div>
+    <div class="skill-card">
+      <div class="skill-icon">✉️</div>
+      <h3>B2B Outreach Generator</h3>
+      <p>Generates personalized B2B email drafts for German dealers. Checks for duplicates and recent contact before every send.</p>
+      <span class="tier-badge pro">Pro</span>
+    </div>
+    <div class="skill-card">
+      <div class="skill-icon">📩</div>
+      <h3>Inquiry Classifier</h3>
+      <p>Classifies incoming customer inquiries and drafts the right reply — in the right language.</p>
+      <span class="tier-badge starter">Starter</span>
+    </div>
+    <div class="skill-card">
+      <div class="skill-icon">📄</div>
+      <h3>Vehicle Doc Generator</h3>
+      <p>Generates a branded PDF price offer from any mobile.de listing URL. Calculates selling price using your margin settings.</p>
+      <span class="tier-badge starter">Starter</span>
+    </div>
+    <div class="skill-card">
+      <div class="skill-icon">💼</div>
+      <h3>LinkedIn Prospector</h3>
+      <p>Finds decision-maker contacts at target dealerships. Sends connection requests and follows up on D+7, D+14, D+21.</p>
+      <span class="tier-badge pro">Pro</span>
+    </div>
+    <div class="skill-card">
+      <div class="skill-icon">📋</div>
+      <h3>Daily Digest</h3>
+      <p>Morning briefing: unread inbox, pending follow-ups, market pulse, and your 3 most important actions for the day.</p>
+      <span class="tier-badge pro">Pro</span>
+    </div>
+    <div class="skill-card">
+      <div class="skill-icon">🧹</div>
+      <h3>Contact Deduplicator</h3>
+      <p>Cleans your B2B contact list before every campaign. Removes duplicates, flags recently contacted, enforces your exclude rules.</p>
+      <span class="tier-badge pro">Pro</span>
+    </div>
+  </div>
+</section>
+
+<!-- PRICING -->
+<section id="pricing" style="background: var(--light); border-radius: 16px;">
+  <h2>Simple pricing</h2>
+  <p class="sub">Start free with core skills. Upgrade when you're ready to automate the full workflow.</p>
+  <div class="pricing-grid">
+    <div class="plan">
+      <div class="plan-name">Starter</div>
+      <div class="plan-price">€49<span>/mo</span></div>
+      <div class="plan-desc">Core tools for procurement and customer handling.</div>
+      <ul>
+        <li>Car Listing Scanner</li>
+        <li>Inquiry Classifier</li>
+        <li>Vehicle Doc Generator</li>
+        <li>Config-driven setup</li>
+        <li>Email support</li>
+      </ul>
+      <a href="https://gearos.eu/checkout?tier=starter" class="plan-btn plan-btn-secondary">Get Starter</a>
+    </div>
+    <div class="plan featured">
+      <div class="plan-label">Most popular</div>
+      <div class="plan-name">Pro</div>
+      <div class="plan-price">€99<span>/mo</span></div>
+      <div class="plan-desc">Full B2B automation workflow for active exporters.</div>
+      <ul>
+        <li>Everything in Starter</li>
+        <li>B2B Outreach Generator</li>
+        <li>Competitor Pricing Monitor</li>
+        <li>Daily Digest</li>
+        <li>LinkedIn Prospector</li>
+        <li>Contact Deduplicator</li>
+        <li>Priority support</li>
+      </ul>
+      <a href="https://gearos.eu/checkout?tier=pro" class="plan-btn plan-btn-primary">Get Pro</a>
+    </div>
+    <div class="plan">
+      <div class="plan-name">Agency</div>
+      <div class="plan-price">€199<span>/mo</span></div>
+      <div class="plan-desc">For groups managing multiple dealer locations.</div>
+      <ul>
+        <li>Everything in Pro</li>
+        <li>Multi-dealer config</li>
+        <li>White-label output</li>
+        <li>Custom skill development</li>
+        <li>Onboarding call included</li>
+      </ul>
+      <a href="mailto:support@gearos.eu" class="plan-btn plan-btn-secondary">Contact us</a>
+    </div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section>
+  <h2>Common questions</h2>
+  <div class="faq-list">
+    <div class="faq-item">
+      <h3>Do I need a Claude subscription?</h3>
+      <p>Yes. GearOS is a plugin for Claude Code, which requires an Anthropic account. A Pro plan ($20/mo) is sufficient for most dealers.</p>
+    </div>
+    <div class="faq-item">
+      <h3>Does GearOS send emails automatically?</h3>
+      <p>No. Every email, draft, or message requires your explicit approval before anything is sent. GearOS generates, you decide.</p>
+    </div>
+    <div class="faq-item">
+      <h3>Does it work with AutoScout24?</h3>
+      <p>Yes. The car-listing-scanner and competitor-pricing-monitor include AutoScout24 as a fallback when mobile.de is unavailable.</p>
+    </div>
+    <div class="faq-item">
+      <h3>Where is my data stored?</h3>
+      <p>Everything runs locally on your machine. GearOS does not store your vehicle data, contact lists, or emails. The only external call is the license key validation.</p>
+    </div>
+    <div class="faq-item">
+      <h3>What countries does it support?</h3>
+      <p>GearOS is built for dealers sourcing from Germany (DE) and selling in SK, CZ, PL, HU, RO, and other EU markets. Language support: DE, EN, SK, CS, PL, HU, RO, FR, IT.</p>
+    </div>
+    <div class="faq-item">
+      <h3>Can I customize it?</h3>
+      <p>Yes. All behavior is controlled by config files — no coding required. For custom skills or white-label builds, contact us about the Agency tier.</p>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section style="text-align: center; padding-bottom: 100px;">
+  <h2>Ready to start?</h2>
+  <p style="color: var(--gray); margin: 16px auto 40px; max-width: 480px;">Get the full toolkit on GitHub. Free to inspect, configure, and test — license key required to run skills.</p>
+  <a href="https://github.com/gearos/gearos-toolkit" class="btn-primary" style="font-size: 1rem; padding: 16px 36px;">Get GearOS on GitHub →</a>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div>
+    <div class="logo" style="margin-bottom: 4px;">Gear<span style="color: var(--accent);">OS</span></div>
+    <p>AI toolkit for EU automotive dealers.</p>
+  </div>
+  <div>
+    <a href="https://github.com/gearos/gearos-toolkit">GitHub</a>
+    <a href="docs/INSTALL.md">Docs</a>
+    <a href="mailto:support@gearos.eu">support@gearos.eu</a>
+  </div>
+</footer>
+
+</body>
+</html>

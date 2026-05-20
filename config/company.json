@@ -1,0 +1,23 @@
+{
+  "_instructions": "Fill in your dealership details. This file is used by all GearOS skills.",
+
+  "name": "RF Motors",
+  "legal_name": "RF Motors s.r.o.",
+  "website": "rfmotors.eu",
+  "email": "rybarsky@rfmotors.eu",
+  "phone": "+421 902 235 218",
+  "address": {
+    "city": "Bratislava",
+    "country": "Slovakia",
+    "country_code": "SK"
+  },
+  "owner_name": "Juraj Rybarsky",
+  "owner_title": "Owner & B2B Manager",
+  "vat_number": "",
+
+  "branding": {
+    "logo_url": "https://www.rfmotors.sk/wp-content/uploads/2025/02/rfmotors-logo.svg",
+    "primary_color": "#0f0f0f",
+    "secondary_color": "#ffffff"
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "name": "GearOS",
+  "version": "1.0.0",
+  "description": "AI toolkit for EU automotive dealers — plug-and-play Claude skills.",
+  "author": "GearOS (gearos.eu)",
+  "requires": {
+    "claude-cowork": ">=2.0",
+    "claude-in-chrome": ">=1.5"
+  },
+  "tier": "starter",
+  "config": {
+    "company": "config/company.json",
+    "languages": "config/languages.json",
+    "inventory_source": "config/inventory_source.json",
+    "pricing_rules": "config/pricing_rules.json",
+    "outreach_voice": "config/outreach_voice.md",
+    "license": "config/license.json"
+  },
+  "skills": [
+    "skills/car-listing-scanner",
+    "skills/competitor-pricing-monitor",
+    "skills/b2b-outreach-generator",
+    "skills/inquiry-classifier",
+    "skills/vehicle-doc-generator",
+    "skills/linkedin-prospector",
+    "skills/daily-digest",
+    "skills/contact-deduplicator"
+  ],
+  "license_check_url": "https://api.gearos.eu/license"
+}
