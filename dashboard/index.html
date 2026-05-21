@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GearOS — Dealer Dashboard</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0f1117;--surface:#1a1d27;--surface2:#22263a;--border:#2a2e42;
+  --text:#e8eaf0;--muted:#6b7280;--accent:#2563eb;--accent-light:#1e3a8a;
+  --green:#22c55e;--yellow:#f59e0b;--red:#ef4444;--purple:#8b5cf6;
+  --font:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+}
+body{font-family:var(--font);background:var(--bg);color:var(--text);height:100vh;overflow:hidden}
+
+/* ── LOGIN ── */
+#login{display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;gap:32px}
+.login-box{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:48px;width:420px;text-align:center}
+.login-logo{font-size:2rem;font-weight:800;letter-spacing:-1px;margin-bottom:8px}
+.login-logo span{color:var(--accent)}
+.login-sub{color:var(--muted);font-size:.9rem;margin-bottom:32px}
+.login-box input{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:14px 16px;color:var(--text);font-size:.95rem;font-family:monospace;letter-spacing:1px;outline:none;transition:border .15s}
+.login-box input:focus{border-color:var(--accent)}
+.login-box input::placeholder{color:var(--muted);letter-spacing:0;font-family:var(--font)}
+.login-btn{width:100%;margin-top:16px;background:var(--accent);color:white;border:none;border-radius:8px;padding:14px;font-size:.95rem;font-weight:600;cursor:pointer;transition:background .15s}
+.login-btn:hover{background:#1d4ed8}
+.login-hint{margin-top:20px;font-size:.8rem;color:var(--muted)}
+.login-hint code{background:var(--surface2);padding:2px 8px;border-radius:4px;font-size:.8rem;color:var(--accent)}
+.login-error{color:var(--red);font-size:.85rem;margin-top:12px;display:none}
+
+/* ── APP SHELL ── */
+#app{display:none;height:100vh;flex-direction:row}
+aside{width:220px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:20px 0;flex-shrink:0}
+.logo{padding:0 20px 20px;font-size:1.2rem;font-weight:800;letter-spacing:-0.5px;border-bottom:1px solid var(--border)}
+.logo span{color:var(--accent)}
+.tier-badge{font-size:.65rem;font-weight:600;background:var(--accent-light);color:#93c5fd;padding:2px 8px;border-radius:20px;margin-left:8px;text-transform:uppercase}
+nav{padding:16px 0;flex:1}
+.nav-item{display:flex;align-items:center;gap:12px;padding:10px 20px;cursor:pointer;font-size:.875rem;color:var(--muted);transition:all .15s;border-left:3px solid transparent}
+.nav-item:hover{color:var(--text);background:var(--surface2)}
+.nav-item.active{color:var(--text);background:var(--surface2);border-left-color:var(--accent)}
+.nav-icon{font-size:1rem;width:20px;text-align:center}
+.sidebar-bottom{padding:16px 20px;border-top:1px solid var(--border)}
+.dealer-info{font-size:.8rem}
+.dealer-name{font-weight:600;color:var(--text)}
+.dealer-email{color:var(--muted);margin-top:2px}
+
+main{flex:1;overflow-y:auto;background:var(--bg)}
+.page{display:none;padding:32px;max-width:1100px}
+.page.active{display:block}
+.page-header{margin-bottom:28px}
+.page-header h1{font-size:1.5rem;font-weight:700;letter-spacing:-.5px}
+.page-header p{color:var(--muted);margin-top:6px;font-size:.9rem}
+
+/* ── STATS ── */
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:28px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px}
+.stat-label{font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
+.stat-value{font-size:1.8rem;font-weight:700;line-height:1}
+.stat-sub{font-size:.75rem;color:var(--muted);margin-top:6px}
+.up{color:var(--green)}
+.warn{color:var(--yellow)}
+
+/* ── QUICK ACTIONS ── */
+.section-title{font-size:.85rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:16px}
+.actions-row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:28px}
+.action-btn{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px 18px;font-size:.875rem;color:var(--text);cursor:pointer;transition:all .15s}
+.action-btn:hover{border-color:var(--accent);background:var(--surface2)}
+.action-btn .ico{font-size:1rem}
+
+/* ── ACTIVITY ── */
+.activity-list{background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.activity-row{display:flex;align-items:center;gap:16px;padding:14px 20px;border-bottom:1px solid var(--border);font-size:.875rem}
+.activity-row:last-child{border-bottom:none}
+.activity-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.dot-green{background:var(--green)}
+.dot-yellow{background:var(--yellow)}
+.dot-blue{background:var(--accent)}
+.activity-text{flex:1}
+.activity-time{color:var(--muted);font-size:.8rem}
+
+/* ── SKILLS PAGE ── */
+.skills-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
+.skill-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:24px;display:flex;flex-direction:column;gap:12px;transition:border .15s}
+.skill-card:hover{border-color:var(--accent)}
+.skill-header{display:flex;align-items:flex-start;justify-content:space-between}
+.skill-icon{font-size:1.4rem}
+.skill-tier{font-size:.65rem;font-weight:600;padding:2px 8px;border-radius:20px;text-transform:uppercase}
+.tier-starter{background:#14532d;color:#86efac}
+.tier-pro{background:var(--accent-light);color:#93c5fd}
+.skill-name{font-size:.95rem;font-weight:600;margin-top:4px}
+.skill-desc{font-size:.825rem;color:var(--muted);line-height:1.5}
+.skill-run-btn{margin-top:4px;background:var(--accent);color:white;border:none;border-radius:6px;padding:9px 16px;font-size:.825rem;font-weight:600;cursor:pointer;transition:background .15s;align-self:flex-start}
+.skill-run-btn:hover{background:#1d4ed8}
+.skill-run-btn.locked{background:var(--surface2);color:var(--muted);cursor:default}
+
+/* ── SKILL RUNNER ── */
+#runner-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;align-items:center;justify-content:center}
+#runner-overlay.open{display:flex}
+.runner-box{background:var(--surface);border:1px solid var(--border);border-radius:12px;width:740px;max-height:85vh;display:flex;flex-direction:column}
+.runner-header{display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid var(--border)}
+.runner-title{font-size:1rem;font-weight:600}
+.runner-close{background:none;border:none;color:var(--muted);font-size:1.2rem;cursor:pointer;padding:4px}
+.runner-close:hover{color:var(--text)}
+.runner-input-row{padding:16px 24px;border-bottom:1px solid var(--border);display:flex;gap:12px}
+.runner-input{flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:10px 14px;color:var(--text);font-size:.875rem;outline:none}
+.runner-input:focus{border-color:var(--accent)}
+.runner-go{background:var(--accent);color:white;border:none;border-radius:6px;padding:10px 20px;font-size:.875rem;font-weight:600;cursor:pointer}
+.runner-go:hover{background:#1d4ed8}
+.terminal{flex:1;overflow-y:auto;padding:20px 24px;font-family:'Courier New',monospace;font-size:.8rem;line-height:1.7;min-height:320px;max-height:460px}
+.t-dim{color:var(--muted)}
+.t-accent{color:#60a5fa}
+.t-green{color:var(--green)}
+.t-yellow{color:var(--yellow)}
+.t-red{color:var(--red)}
+.t-white{color:var(--text)}
+.t-bold{font-weight:700}
+.cursor{display:inline-block;width:8px;height:14px;background:var(--accent);vertical-align:middle;animation:blink 1s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+
+/* ── CONTACTS ── */
+.table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden}
+table{width:100%;border-collapse:collapse;font-size:.85rem}
+th{text-align:left;padding:12px 16px;color:var(--muted);font-size:.75rem;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border);font-weight:600}
+td{padding:12px 16px;border-bottom:1px solid var(--border)}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--surface2)}
+.status-pill{display:inline-block;padding:2px 10px;border-radius:20px;font-size:.72rem;font-weight:600}
+.status-sent{background:#1e3a8a;color:#93c5fd}
+.status-replied{background:#14532d;color:#86efac}
+.status-cold{background:#3f1515;color:#fca5a5}
+.status-new{background:#3f3415;color:#fde68a}
+
+/* ── SETTINGS ── */
+.settings-section{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:24px;margin-bottom:20px}
+.settings-section h3{font-size:.9rem;font-weight:600;margin-bottom:20px;padding-bottom:12px;border-bottom:1px solid var(--border)}
+.field-row{display:grid;grid-template-columns:200px 1fr;align-items:center;gap:16px;margin-bottom:16px}
+.field-label{font-size:.85rem;color:var(--muted)}
+.field-input{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:9px 12px;color:var(--text);font-size:.875rem;outline:none;width:100%}
+.field-input:focus{border-color:var(--accent)}
+.save-btn{background:var(--accent);color:white;border:none;border-radius:6px;padding:10px 24px;font-size:.875rem;font-weight:600;cursor:pointer}
+.save-btn:hover{background:#1d4ed8}
+.save-confirm{color:var(--green);font-size:.8rem;margin-left:12px;opacity:0;transition:opacity .3s}
+</style>
+</head>
+<body>
+
+<!-- ── LOGIN ── -->
+<div id="login">
+  <div class="login-box">
+    <div class="login-logo">Gear<span>OS</span></div>
+    <p class="login-sub">Dealer Dashboard — zadajte váš licenčný kľúč</p>
+    <input type="text" id="license-input" placeholder="GEAR-XXXX-XXXX-XXXX" maxlength="19" oninput="formatKey(this)">
+    <div class="login-error" id="login-error">Neplatný kľúč. Skúste GEAR-DEMO-0000-0001</div>
+    <button class="login-btn" onclick="doLogin()">Vstúpiť do dashboardu →</button>
+    <p class="login-hint">Demo kľúč: <code>GEAR-DEMO-0000-0001</code></p>
+  </div>
+</div>
+
+<!-- ── APP ── -->
+<div id="app">
+  <aside>
+    <div class="logo">Gear<span>OS</span><span class="tier-badge">Pro</span></div>
+    <nav>
+      <div class="nav-item active" onclick="showPage('dashboard',this)"><span class="nav-icon">📋</span> Dashboard</div>
+      <div class="nav-item" onclick="showPage('skills',this)"><span class="nav-icon">⚡</span> Skills</div>
+      <div class="nav-item" onclick="showPage('contacts',this)"><span class="nav-icon">👥</span> Kontakty</div>
+      <div class="nav-item" onclick="showPage('settings',this)"><span class="nav-icon">⚙️</span> Nastavenia</div>
+    </nav>
+    <div class="sidebar-bottom">
+      <div class="dealer-info">
+        <div class="dealer-name" id="sb-name">AutoTest s.r.o.</div>
+        <div class="dealer-email" id="sb-email">info@autotest.sk</div>
+        <div style="margin-top:8px;font-size:.75rem;color:var(--muted)">Platné do: 31.12.2027</div>
+      </div>
+    </div>
+  </aside>
+
+  <main>
+    <!-- DASHBOARD -->
+    <div class="page active" id="page-dashboard">
+      <div class="page-header">
+        <h1>Dobré ráno, <span id="owner-name">Peter</span> 👋</h1>
+        <p>Štvrtok, 21. mája 2026 — tu je váš denný prehľad</p>
+      </div>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label">Nové dopyty</div>
+          <div class="stat-value up">3</div>
+          <div class="stat-sub">+2 oproti včera</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Follow-upy dnes</div>
+          <div class="stat-value warn">5</div>
+          <div class="stat-sub">D+7: 3 · D+14: 2</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Posledný scan</div>
+          <div class="stat-value" style="font-size:1.1rem;padding-top:4px">VW Golf</div>
+          <div class="stat-sub">Včera · 4 kandidáti</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">B2B kontakty</div>
+          <div class="stat-value">142</div>
+          <div class="stat-sub">12 aktívnych</div>
+        </div>
+      </div>
+      <div class="section-title">Rýchle akcie</div>
+      <div class="actions-row">
+        <div class="action-btn" onclick="openRunner('car-listing-scanner')"><span class="ico">🔍</span> Nový scan</div>
+        <div class="action-btn" onclick="showPage('contacts',document.querySelector('[onclick*=contacts]'))"><span class="ico">📤</span> Follow-upy</div>
+        <div class="action-btn" onclick="openRunner('inquiry-classifier')"><span class="ico">📩</span> Klasifikovať dopyt</div>
+        <div class="action-btn" onclick="openRunner('daily-digest')"><span class="ico">📋</span> Daily Digest</div>
+      </div>
+      <div class="section-title">Posledná aktivita</div>
+      <div class="activity-list">
+        <div class="activity-row"><div class="activity-dot dot-green"></div><div class="activity-text"><strong>VW Golf diesel</strong> — scan dokončený, 4 odporúčania</div><div class="activity-time">pred 2h</div></div>
+        <div class="activity-row"><div class="activity-dot dot-blue"></div><div class="activity-text">Dopyt od zákazníka: <strong>cena BMW 320d</strong> — price_request, odpoveď odoslaná</div><div class="activity-time">pred 4h</div></div>
+        <div class="activity-row"><div class="activity-dot dot-yellow"></div><div class="activity-text"><strong>3 follow-upy D+7</strong> — čakajú na odoslanie</div><div class="activity-time">dnes</div></div>
+        <div class="activity-row"><div class="activity-dot dot-green"></div><div class="activity-text">B2B email — <strong>Autohaus Müller</strong> odpovedal: záujem</div><div class="activity-time">včera</div></div>
+        <div class="activity-row"><div class="activity-dot dot-blue"></div><div class="activity-text">LinkedIn — <strong>2 nové spojenia</strong> z kampane Škoda Octavia</div><div class="activity-time">včera</div></div>
+      </div>
+    </div>
+
+    <!-- SKILLS -->
+    <div class="page" id="page-skills">
+      <div class="page-header">
+        <h1>Skills</h1>
+        <p>Kliknite na skill a spustite ho — výsledky sa zobrazia priamo tu</p>
+      </div>
+      <div class="skills-grid">
+        <div class="skill-card">
+          <div class="skill-header"><div class="skill-icon">🔍</div><span class="skill-tier tier-starter">Starter</span></div>
+          <div class="skill-name">Car Listing Scanner</div>
+          <div class="skill-desc">Skenuje mobile.de podľa vašich kritérií. Hodnotí a radí podľa odhadovanej marže.</div>
+          <button class="skill-run-btn" onclick="openRunner('car-listing-scanner')">▶ Spustiť</button>
+        </div>
+        <div class="skill-card">
+          <div class="skill-header"><div class="skill-icon">📊</div><span class="skill-tier tier-pro">Pro</span></div>
+          <div class="skill-name">Competitor Pricing Monitor</div>
+          <div class="skill-desc">Nájde nemeckých dealerôv predávajúcich rovnaký model drahšie. Identifikuje B2B ciele.</div>
+          <button class="skill-run-btn" onclick="openRunner('competitor-pricing-monitor')">▶ Spustiť</button>
+        </div>
+        <div class="skill-card">
+          <div class="skill-header"><div class="skill-icon">✉️</div><span class="skill-tier tier-pro">Pro</span></div>
+          <div class="skill-name">B2B Outreach Generator</div>
+          <div class="skill-desc">Generuje personalizované B2B emaily pre nemeckých dealerôv. Nikdy neodosiela automaticky.</div>
+          <button class="skill-run-btn" onclick="openRunner('b2b-outreach-generator')">▶ Spustiť</button>
+        </div>
+        <div class="skill-card">
+          <div class="skill-header"><div class="skill-icon">📩</div><span class="skill-tier tier-starter">Starter</span></div>
+          <div class="skill-name">Inquiry Classifier</div>
+          <div class="skill-desc">Klasifikuje dopyty zákazníkov a navrhne správnu odpoveď v správnom jazyku.</div>
+          <button class="skill-run-btn" onclick="openRunner('inquiry-classifier')">▶ Spustiť</button>
+        </div>
+        <div class="skill-card">
+          <div class="skill-header"><div class="skill-icon">📄</div><span class="skill-tier tier-starter">Starter</span></div>
+          <div class="skill-name">Vehicle Doc Generator</div>
+          <div class="skill-desc">Vygeneruje brandovanú PDF ponuku z URL inzerátu. Automaticky vypočíta predajnú cenu.</div>
+          <button class="skill-run-btn" onclick="openRunner('vehicle-doc-generator')">▶ Spustiť</button>
+        </div>
+        <div class="skill-card">
+          <div class="skill-header"><div class="skill-icon">💼</div><span class="skill-tier tier-pro">Pro</span></div>
+          <div class="skill-name">LinkedIn Prospector</div>
+          <div class="skill-desc">Nájde rozhodovacie osoby v cieľových dealerstvách. Follow-up D+7, D+14, D+21.</div>
+          <button class="skill-run-btn" onclick="openRunner('linkedin-prospector')">▶ Spustiť</button>
+        </div>
+        <div class="skill-card">
+          <div class="skill-header"><div class="skill-icon">📋</div><span class="skill-tier tier-pro">Pro</span></div>
+          <div class="skill-name">Daily Digest</div>
+          <div class="skill-desc">Ranné zhrnutie: inbox, pipeline, market pulse a 3 priority na dnes.</div>
+          <button class="skill-run-btn" onclick="openRunner('daily-digest')">▶ Spustiť</button>
+        </div>
+        <div class="skill-card">
+          <div class="skill-header"><div class="skill-icon">🧹</div><span class="skill-tier tier-pro">Pro</span></div>
+          <div class="skill-name">Contact Deduplicator</div>
+          <div class="skill-desc">Vyčistí váš B2B zoznam kontaktov pred každou kampaňou.</div>
+          <button class="skill-run-btn" onclick="openRunner('contact-deduplicator')">▶ Spustiť</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONTACTS -->
+    <div class="page" id="page-contacts">
+      <div class="page-header">
+        <h1>B2B Kontakty</h1>
+        <p>142 kontaktov · 12 aktívnych · 5 follow-upov dnes</p>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Meno</th><th>Firma</th><th>Email</th><th>Posledný kontakt</th><th>Status</th><th>Akcia</th></tr></thead>
+          <tbody>
+            <tr><td>Klaus Berger</td><td>Autohaus Müller GmbH</td><td>k.berger@autohaus-mueller.de</td><td>14.05.2026</td><td><span class="status-pill status-replied">Odpovedal</span></td><td><button class="skill-run-btn" style="padding:5px 12px;font-size:.75rem" onclick="openRunner('b2b-outreach-generator')">Follow-up</button></td></tr>
+            <tr><td>Thomas Schneider</td><td>Premium Cars DE</td><td>t.schneider@premiumcars.de</td><td>07.05.2026</td><td><span class="status-pill status-sent">Odoslaný</span></td><td><button class="skill-run-btn" style="padding:5px 12px;font-size:.75rem" onclick="openRunner('b2b-outreach-generator')">D+14</button></td></tr>
+            <tr><td>Maria Koch</td><td>WELLER Premium GmbH</td><td>info@wellergruppe.de</td><td>07.05.2026</td><td><span class="status-pill status-sent">Odoslaný</span></td><td><button class="skill-run-btn" style="padding:5px 12px;font-size:.75rem" onclick="openRunner('b2b-outreach-generator')">D+14</button></td></tr>
+            <tr><td>Hans Weber</td><td>AutoZentrum Frankfurt</td><td>h.weber@autozentrum.de</td><td>21.04.2026</td><td><span class="status-pill status-cold">Studený</span></td><td><span style="font-size:.8rem;color:var(--muted)">Stop</span></td></tr>
+            <tr><td>Stefan Braun</td><td>Procar Automobile GmbH</td><td>s.braun@procar.de</td><td>30.04.2026</td><td><span class="status-pill status-sent">Odoslaný</span></td><td><button class="skill-run-btn" style="padding:5px 12px;font-size:.75rem" onclick="openRunner('b2b-outreach-generator')">D+21</button></td></tr>
+            <tr><td>Anna Fischer</td><td>Neue Kontakt GmbH</td><td>a.fischer@neuekontakt.de</td><td>—</td><td><span class="status-pill status-new">Nový</span></td><td><button class="skill-run-btn" style="padding:5px 12px;font-size:.75rem" onclick="openRunner('b2b-outreach-generator')">Oslovi</button></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- SETTINGS -->
+    <div class="page" id="page-settings">
+      <div class="page-header">
+        <h1>Nastavenia</h1>
+        <p>Konfigurácia vašej dealerky — zmeny sa aplikujú okamžite na všetky skills</p>
+      </div>
+      <div class="settings-section">
+        <h3>🏢 Identita dealerky</h3>
+        <div class="field-row"><label class="field-label">Názov firmy</label><input class="field-input" id="cfg-name" value="AutoTest s.r.o."></div>
+        <div class="field-row"><label class="field-label">Majiteľ</label><input class="field-input" id="cfg-owner" value="Peter Novák"></div>
+        <div class="field-row"><label class="field-label">Email</label><input class="field-input" id="cfg-email" value="info@autotest.sk"></div>
+        <div class="field-row"><label class="field-label">Telefón</label><input class="field-input" value="+421 900 123 456"></div>
+        <div class="field-row"><label class="field-label">Mesto</label><input class="field-input" value="Košice, Slovensko"></div>
+        <button class="save-btn" onclick="saveSettings()">Uložiť</button>
+        <span class="save-confirm" id="save-confirm">✓ Uložené</span>
+      </div>
+      <div class="settings-section">
+        <h3>💶 Nákupné kritériá</h3>
+        <div class="field-row"><label class="field-label">Budget min (€)</label><input class="field-input" value="8 000"></div>
+        <div class="field-row"><label class="field-label">Budget max (€)</label><input class="field-input" value="20 000"></div>
+        <div class="field-row"><label class="field-label">Max nájazd (km)</label><input class="field-input" value="80 000"></div>
+        <div class="field-row"><label class="field-label">Max vek (roky)</label><input class="field-input" value="5"></div>
+        <div class="field-row"><label class="field-label">Min marža (€)</label><input class="field-input" value="2 000"></div>
+        <div class="field-row"><label class="field-label">Transport (€)</label><input class="field-input" value="800"></div>
+        <button class="save-btn" onclick="saveSettings()">Uložiť</button>
+      </div>
+      <div class="settings-section">
+        <h3>🔑 Licencia</h3>
+        <div class="field-row"><label class="field-label">Kľúč</label><input class="field-input" value="GEAR-DEMO-0000-0001" style="font-family:monospace" readonly></div>
+        <div class="field-row"><label class="field-label">Tier</label><input class="field-input" value="Pro" readonly></div>
+        <div class="field-row"><label class="field-label">Platné do</label><input class="field-input" value="31.12.2027" readonly></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ── SKILL RUNNER OVERLAY ── -->
+<div id="runner-overlay">
+  <div class="runner-box">
+    <div class="runner-header">
+      <div class="runner-title" id="runner-title">🔍 Car Listing Scanner</div>
+      <button class="runner-close" onclick="closeRunner()">✕</button>
+    </div>
+    <div class="runner-input-row">
+      <input class="runner-input" id="runner-input" placeholder="Napr: BMW 3er diesel, VW Golf 2020, Škoda Octavia..." onkeydown="if(event.key==='Enter')runSkill()">
+      <button class="runner-go" onclick="runSkill()">▶ Spustiť</button>
+    </div>
+    <div class="terminal" id="terminal">
+      <span class="t-dim">// Zadajte model a stlačte Spustiť...</span>
+    </div>
+  </div>
+</div>
+
+<script>
+const VALID_KEYS = ['GEAR-DEMO-0000-0001','GEAR-TEST-0000-0002'];
+
+function formatKey(el){
+  let v = el.value.replace(/[^A-Z0-9]/gi,'').toUpperCase().substring(0,16);
+  let out = '';
+  for(let i=0;i<v.length;i++){
+    if(i===4||i===8||i===12) out+='-';
+    out+=v[i];
+  }
+  el.value = out;
+}
+
+function doLogin(){
+  const key = document.getElementById('license-input').value.trim().toUpperCase();
+  const err = document.getElementById('login-error');
+  if(VALID_KEYS.includes(key)){
+    err.style.display='none';
+    document.getElementById('login').style.display='none';
+    document.getElementById('app').style.display='flex';
+  } else {
+    err.style.display='block';
+  }
+}
+
+document.getElementById('license-input').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
+
+function showPage(id, el){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  if(el) el.classList.add('active');
+}
+
+const SKILL_META = {
+  'car-listing-scanner':          {icon:'🔍', title:'Car Listing Scanner',         ph:'Napr: VW Golf diesel, BMW 3er, Škoda Octavia...'},
+  'competitor-pricing-monitor':   {icon:'📊', title:'Competitor Pricing Monitor',  ph:'Napr: BMW 320d 2023, VW Passat diesel...'},
+  'b2b-outreach-generator':       {icon:'✉️', title:'B2B Outreach Generator',      ph:'Napr: Autohaus Müller Hamburg, WELLER Premium...'},
+  'inquiry-classifier':           {icon:'📩', title:'Inquiry Classifier',          ph:'Sem vložte text dopytu od zákazníka...'},
+  'vehicle-doc-generator':        {icon:'📄', title:'Vehicle Doc Generator',       ph:'URL z mobile.de alebo napr: BMW 320d 2023 51tkm...'},
+  'linkedin-prospector':          {icon:'💼', title:'LinkedIn Prospector',         ph:'Napr: Autohaus München, Premium Cars DE...'},
+  'daily-digest':                 {icon:'📋', title:'Daily Digest',                ph:'(stlačte Spustiť pre dnešný prehľad)'},
+  'contact-deduplicator':         {icon:'🧹', title:'Contact Deduplicator',        ph:'(stlačte Spustiť pre analýzu kontaktov)'},
+};
+
+let currentSkill = '';
+function openRunner(skill){
+  currentSkill = skill;
+  const m = SKILL_META[skill] || {icon:'⚡',title:skill,ph:'...'};
+  document.getElementById('runner-title').textContent = m.icon+' '+m.title;
+  document.getElementById('runner-input').placeholder = m.ph;
+  document.getElementById('runner-input').value = '';
+  document.getElementById('terminal').innerHTML = '<span class="t-dim">// Zadajte model a stlačte Spustiť...</span>';
+  document.getElementById('runner-overlay').classList.add('open');
+  setTimeout(()=>document.getElementById('runner-input').focus(),100);
+}
+function closeRunner(){
+  document.getElementById('runner-overlay').classList.remove('open');
+}
+document.getElementById('runner-overlay').addEventListener('click', e=>{ if(e.target===document.getElementById('runner-overlay')) closeRunner(); });
+
+const OUTPUTS = {
+  'car-listing-scanner': (q) => [
+    [`<span class="t-dim">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</span>`],
+    [`<span class="t-accent">GearOS</span> <span class="t-dim">·</span> <span class="t-white">Car Listing Scanner</span>`],
+    [`<span class="t-dim">Config: AutoTest s.r.o. · Budget €8k–20k · Max 80tkm · 5 rokov</span>`],
+    [`<span class="t-dim">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</span>`],
+    [`<span class="t-dim">Hľadám: </span><span class="t-white">${q || 'VW Golf diesel'}</span><span class="t-dim"> · mobile.de · DE</span>`],
+    [`<span class="t-dim">Načítavam výsledky...</span>`],
+    [`<span class="t-dim">Nájdených: 847 inzerátov · Filtrujem podľa kritérií...</span>`],
+    [`<span class="t-dim">Po filtrovaní (budget + nájazd + vek + red flags): 23 kandidátov</span>`],
+    [``],
+    [`<span class="t-dim">──── SHORTLIST ─────────────────────────────</span>`],
+    [`<span class="t-green">✅ ODPORÚČAM</span>`],
+    [``],
+    [`<span class="t-white t-bold">#1 · VW Golf 2.0 TDI DSG · 16.800 € · EZ 03/2022 · 54.200 km</span>`],
+    [`<span class="t-dim">   140 kW (190 PS) · Diesel · Unfallfrei · Automatik</span>`],
+    [`<span class="t-dim">   Autohaus Kern GmbH · ⭐4.8 (312) · 80331 München</span>`],
+    [`<span class="t-dim">   Segment: compact_mass · Markup: 10%</span>`],
+    [`<span class="t-accent">   Odhadovaná predajná cena: ~19.280 € · Hrubá marža: ~1.680 €</span>`],
+    [``],
+    [`<span class="t-white t-bold">#2 · VW Golf 1.6 TDI · 14.990 € · EZ 07/2021 · 67.000 km</span>`],
+    [`<span class="t-dim">   85 kW (115 PS) · Diesel · Unfallfrei · Scheckheft lückenlos</span>`],
+    [`<span class="t-dim">   Fahrzeugmarkt Schmidt · ⭐4.6 (89) · 50667 Köln</span>`],
+    [`<span class="t-accent">   Odhadovaná predajná cena: ~17.239 € · Hrubá marža: ~1.449 €</span>`],
+    [``],
+    [`<span class="t-yellow">🟡 OK</span>`],
+    [``],
+    [`<span class="t-white">#3 · VW Golf 2.0 TDI · 18.500 € · EZ 11/2021 · 58.900 km · 150 kW</span>`],
+    [`<span class="t-dim">   Unfallfrei · Leder · Pano · Autohaus Richter GmbH</span>`],
+    [`<span class="t-accent">   Predajná cena: ~21.275 € · Hrubá marža: ~1.975 €</span> <span class="t-dim">(pri limite 2.000€)</span>`],
+    [``],
+    [`<span class="t-dim">──────────────────────────────────────────</span>`],
+    [`<span class="t-dim">❌ Vylúčených: 20 (9× budget, 6× nájazd, 3× vek, 2× nehoda)</span>`],
+    [``],
+    [`<span class="t-dim">Ďalší krok: </span><span class="t-white">Vygenerovať PDF ponuku alebo B2B email? (pdf / b2b / skip)</span>`],
+  ],
+  'inquiry-classifier': (q) => [
+    [`<span class="t-dim">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</span>`],
+    [`<span class="t-accent">GearOS</span> <span class="t-dim">·</span> <span class="t-white">Inquiry Classifier</span>`],
+    [`<span class="t-dim">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</span>`],
+    [`<span class="t-dim">Analyzujem dopyt...</span>`],
+    [``],
+    [`<span class="t-white t-bold">📩 Klasifikácia dopytu</span>`],
+    [``],
+    [`<span class="t-dim">Kategória:    </span><span class="t-yellow">price_request</span>`],
+    [`<span class="t-dim">Jazyk:        </span><span class="t-white">slovenčina</span>`],
+    [`<span class="t-dim">Sentiment:    </span><span class="t-green">pozitívny</span>`],
+    [``],
+    [`<span class="t-dim">──── Navrhovaná odpoveď ────────────────────</span>`],
+    [`<span class="t-white">Dobrý deň,</span>`],
+    [``],
+    [`<span class="t-white">ďakujeme za váš záujem. ${q ? 'Cena vozidla' : 'Aktuálna predajná cena'} je</span>`],
+    [`<span class="t-white">uvedená vrátane DPH v režime prirážky (§ 25a zákona o DPH).</span>`],
+    [`<span class="t-white">V prípade záujmu o rezerváciu alebo prehliadku nás</span>`],
+    [`<span class="t-white">kontaktujte na info@autotest.sk alebo +421 900 123 456.</span>`],
+    [``],
+    [`<span class="t-white">S pozdravom,</span>`],
+    [`<span class="t-white">Peter Novák · AutoTest s.r.o.</span>`],
+    [`<span class="t-dim">──────────────────────────────────────────</span>`],
+    [`<span class="t-dim">Odoslať odpoveď? (áno / upraviť)</span>`],
+  ],
+  'daily-digest': () => [
+    [`<span class="t-dim">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</span>`],
+    [`<span class="t-white t-bold">📋 Daily Digest — štvrtok, 21. mája 2026</span>`],
+    [`<span class="t-dim">Dobré ráno, Peter.</span>`],
+    [`<span class="t-dim">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</span>`],
+    [``],
+    [`<span class="t-white t-bold">📬 INBOX (3 neprečítané)</span>`],
+    [`<span class="t-dim">  1. </span><span class="t-white">Ján Kováč — "Koľko stojí Golf diesel?" · price_request · pred 2h</span>`],
+    [`<span class="t-dim">  2. </span><span class="t-white">k.berger@autohaus-mueller.de — "Ja, interessiert..." · replied · pred 4h</span>`],
+    [`<span class="t-dim">  3. </span><span class="t-white">Mária Horváth — "Je ešte dostupný?" · availability · dnes ráno</span>`],
+    [``],
+    [`<span class="t-white t-bold">📤 B2B FOLLOW-UPS</span>`],
+    [`<span class="t-yellow">  D+7 dnes (3):</span>`],
+    [`<span class="t-dim">    · Thomas Schneider @ Premium Cars DE — odoslaný 14.05.</span>`],
+    [`<span class="t-dim">    · Maria Koch @ WELLER Premium — odoslaný 14.05.</span>`],
+    [`<span class="t-dim">    · Jan Müller @ AutoZentrum Berlin — odoslaný 14.05.</span>`],
+    [`<span class="t-yellow">  D+14 (2):</span>`],
+    [`<span class="t-dim">    · Stefan Braun @ Procar GmbH — odoslaný 07.05.</span>`],
+    [`<span class="t-dim">    · Hans Weber @ Autohaus Regensburg — odoslaný 07.05.</span>`],
+    [``],
+    [`<span class="t-white t-bold">📈 MARKET PULSE</span>`],
+    [`<span class="t-dim">  · VW Golf: 2 nové inzeráty spĺňajú kritériá (od €14.500)</span>`],
+    [`<span class="t-dim">  · Škoda Octavia: 1 pokles ceny (€18.900 → €17.400) — Autohaus Kern</span>`],
+    [``],
+    [`<span class="t-dim">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</span>`],
+    [`<span class="t-white t-bold">🎯 3 PRIORITY NA DNES</span>`],
+    [`<span class="t-white">  1. </span><span class="t-accent">Odpovedaj Klausovi Bergerovi</span><span class="t-dim"> — zaujal sa, horúci lead</span>`],
+    [`<span class="t-white">  2. </span><span class="t-accent">Odošli D+7 follow-upy</span><span class="t-dim"> (3 kontakty čakajú)</span>`],
+    [`<span class="t-white">  3. </span><span class="t-accent">Scan: Škoda Octavia</span><span class="t-dim"> — pokles ceny stojí za pozrenie</span>`],
+    [`<span class="t-dim">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</span>`],
+    [`<span class="t-dim">Akcia: reply 2 / follow-up / scan / done</span>`],
+  ],
+  'b2b-outreach-generator': (q) => [
+    [`<span class="t-dim">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</span>`],
+    [`<span class="t-accent">GearOS</span> <span class="t-dim">·</span> <span class="t-white">B2B Outreach Generator</span>`],
+    [`<span class="t-dim">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</span>`],
+    [`<span class="t-dim">Kontrolujem exclude list... ✓</span>`],
+    [`<span class="t-dim">Gmail check (posledných 30 dní)... ✓ (0 emailov)</span>`],
+    [`<span class="t-dim">Overujem trhovú cenu na mobile.de... ✓</span>`],
+    [``],
+    [`<span class="t-white t-bold">✉️ Navrhovaný email</span>`],
+    [`<span class="t-dim">──────────────────────────────────────────</span>`],
+    [`<span class="t-dim">An:      </span><span class="t-white">${q || 'info@autohaus-target.de'}</span>`],
+    [`<span class="t-dim">Von:     </span><span class="t-white">info@autotest.sk</span>`],
+    [`<span class="t-dim">Betreff: </span><span class="t-white">B2B-Angebot: VW Golf 2.0 TDI | EZ 03/2022 | 54.200 km</span>`],
+    [`<span class="t-dim">──────────────────────────────────────────</span>`],
+    [`<span class="t-white">Sehr geehrte Damen und Herren,</span>`],
+    [``],
+    [`<span class="t-white">mein Name ist Peter Novák, Inhaber von AutoTest s.r.o.</span>`],
+    [`<span class="t-white">mit Standort in Košice, Slowakei.</span>`],
+    [``],
+    [`<span class="t-white">Ich sehe, dass Sie aktuell einen VW Golf 2.0 TDI für</span>`],
+    [`<span class="t-white">19.900 € anbieten. Ich habe ein vergleichbares Fahrzeug</span>`],
+    [`<span class="t-white">zur sofortigen Übernahme verfügbar:</span>`],
+    [``],
+    [`<span class="t-white">VW Golf 2.0 TDI DSG | EZ 03/2022 | 54.200 km | 140 kW</span>`],
+    [`<span class="t-white">Diesel | unfallfrei | B2B-Preis: 16.800 € netto</span>`],
+    [``],
+    [`<span class="t-white">Lieferung nach Deutschland möglich.</span>`],
+    [`<span class="t-white">Hätten Sie Interesse?</span>`],
+    [``],
+    [`<span class="t-white">Mit freundlichen Grüßen</span>`],
+    [`<span class="t-white">Peter Novák · AutoTest s.r.o. · +421 900 123 456</span>`],
+    [`<span class="t-dim">──────────────────────────────────────────</span>`],
+    [`<span class="t-dim">⚠️ Čakám na schválenie — vytvoriť Gmail draft? (áno / nie)</span>`],
+  ],
+};
+
+let typeInterval = null;
+function runSkill(){
+  const q = document.getElementById('runner-input').value.trim();
+  const term = document.getElementById('terminal');
+  term.innerHTML = '';
+  if(typeInterval) clearInterval(typeInterval);
+
+  const lines = (OUTPUTS[currentSkill] || OUTPUTS['car-listing-scanner'])(q);
+  let i = 0;
+  typeInterval = setInterval(()=>{
+    if(i >= lines.length){ clearInterval(typeInterval); return; }
+    const div = document.createElement('div');
+    div.innerHTML = lines[i][0] || '&nbsp;';
+    term.appendChild(div);
+    term.scrollTop = term.scrollHeight;
+    i++;
+  }, 60);
+}
+
+function saveSettings(){
+  const name = document.getElementById('cfg-name').value;
+  const owner = document.getElementById('cfg-owner').value.split(' ')[0];
+  document.getElementById('sb-name').textContent = name;
+  document.getElementById('sb-email').textContent = document.getElementById('cfg-email').value;
+  document.getElementById('owner-name').textContent = owner;
+  const c = document.getElementById('save-confirm');
+  c.style.opacity=1;
+  setTimeout(()=>c.style.opacity=0, 2500);
+}
+</script>
+</body>
+</html>
