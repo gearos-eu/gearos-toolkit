@@ -151,9 +151,9 @@ tr:hover td{background:var(--surface2)}
     <div class="login-logo">Gear<span>OS</span></div>
     <p class="login-sub">Dealer Dashboard — zadajte váš licenčný kľúč</p>
     <input type="text" id="license-input" placeholder="GEAR-XXXX-XXXX-XXXX" maxlength="19" oninput="formatKey(this)">
-    <div class="login-error" id="login-error">Neplatný kľúč. Skúste GEAR-DEMO-0000-0001</div>
+    <div class="login-error" id="login-error">Neplatný kľúč</div>
     <button class="login-btn" onclick="doLogin()">Vstúpiť do dashboardu →</button>
-    <p class="login-hint">Demo kľúč: <code>GEAR-DEMO-0000-0001</code></p>
+    <p class="login-hint">Pilot kľúč: <code>GEAR-PILX-AUTO-TEST</code> · Demo: <code>GEAR-DEMO-0000-0001</code></p>
   </div>
 </div>
 
@@ -355,7 +355,9 @@ tr:hover td{background:var(--surface2)}
 </div>
 
 <script>
-const VALID_KEYS = ['GEAR-DEMO-0000-0001','GEAR-TEST-0000-0002'];
+const API_BASE = 'https://gearos-license-api.rybarsky.workers.dev';
+const DEMO_KEYS = ['GEAR-DEMO-0000-0001','GEAR-TEST-0000-0002'];
+let CURRENT_LICENSE = null;
 
 function formatKey(el){
   let v = el.value.replace(/[^A-Z0-9]/gi,'').toUpperCase().substring(0,16);
@@ -367,15 +369,54 @@ function formatKey(el){
   el.value = out;
 }
 
-function doLogin(){
+async function doLogin(){
   const key = document.getElementById('license-input').value.trim().toUpperCase();
   const err = document.getElementById('login-error');
-  if(VALID_KEYS.includes(key)){
-    err.style.display='none';
-    document.getElementById('login').style.display='none';
-    document.getElementById('app').style.display='flex';
-  } else {
+  const btn = document.querySelector('.login-btn');
+  btn.disabled = true; btn.textContent = 'Overujem...';
+  err.style.display='none';
+
+  // Demo režim — bez API (pre rýchle prezeranie)
+  if(DEMO_KEYS.includes(key)){
+    CURRENT_LICENSE = {key, tier:'pro', valid_until:'2027-12-31', issued_to:'Demo Dealer'};
+    enterDashboard();
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API_BASE}/license?key=${encodeURIComponent(key)}`);
+    const data = await res.json();
+    if(data.valid){
+      CURRENT_LICENSE = {key, ...data};
+      enterDashboard();
+    } else {
+      err.textContent = data.reason === 'not_found' ? 'Kľúč nenájdený v databáze' :
+                        data.reason === 'invalid_format' ? 'Neplatný formát kľúča' :
+                        data.reason === 'expired' ? 'Licencia expirovala' :
+                        data.reason === 'inactive' ? 'Licencia deaktivovaná' :
+                        'Neplatný kľúč';
+      err.style.display='block';
+      btn.disabled = false; btn.textContent = 'Vstúpiť do dashboardu →';
+    }
+  } catch(e){
+    err.textContent = 'Chyba spojenia s API';
     err.style.display='block';
+    btn.disabled = false; btn.textContent = 'Vstúpiť do dashboardu →';
+  }
+}
+
+function enterDashboard(){
+  document.getElementById('login').style.display='none';
+  document.getElementById('app').style.display='flex';
+  // Vyplň licenčné údaje v Settings
+  const lic = CURRENT_LICENSE;
+  const keyInput = document.querySelector('#page-settings input[value^="GEAR-"]');
+  if(keyInput) keyInput.value = lic.key;
+  const settingsInputs = document.querySelectorAll('#page-settings input[readonly]');
+  if(settingsInputs[1]) settingsInputs[1].value = lic.tier.charAt(0).toUpperCase()+lic.tier.slice(1);
+  if(settingsInputs[2] && lic.valid_until) {
+    const [y,m,d] = lic.valid_until.split('-');
+    settingsInputs[2].value = `${d}.${m}.${y}`;
   }
 }
 
