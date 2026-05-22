@@ -85,6 +85,14 @@ h1 span{color:#60a5fa}
     <div class="section">
       <h2>Predajné podmienky</h2>
       <div class="field">
+        <label>Cena z mobile.de (€) — informatívne</label>
+        <input id="source-price" type="number" readonly style="opacity:.7">
+      </div>
+      <div class="field">
+        <label>Marža (€)</label>
+        <input id="margin" type="number" placeholder="napr. 2500" oninput="recalcPrice()">
+      </div>
+      <div class="field">
         <label>Predajná cena pre zákazníka (€)</label>
         <input id="selling-price" type="number" placeholder="napr. 28900">
       </div>

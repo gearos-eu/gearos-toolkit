@@ -121,7 +121,16 @@ function showListing(listing) {
   document.getElementById('data-images-count').value =
     (listing.images?.length || 0) + ' (zatiaľ nepoužité — Phase 2)';
   if (listing.price_eur) {
+    document.getElementById('source-price').value = listing.price_eur;
     document.getElementById('selling-price').value = listing.price_eur;
+  }
+}
+
+function recalcPrice(){
+  const src = parseInt(document.getElementById('source-price').value || '0', 10);
+  const mar = parseInt(document.getElementById('margin').value || '0', 10);
+  if (src && mar) {
+    document.getElementById('selling-price').value = src + mar;
   }
 }
 

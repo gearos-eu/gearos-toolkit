@@ -75,18 +75,37 @@
       dealer: null,
     };
 
-    // Title — usually in h1 or document.title
+    // Title — prefer h1, fallback to document.title (mobile.de format: "BMW 318 für 37.470 €")
     const h1 = document.querySelector('h1');
-    if (h1) data.title = h1.textContent.trim();
+    if (h1 && h1.textContent.trim()) {
+      data.title = h1.textContent.trim();
+    } else {
+      // document.title: "BMW 318 für 37.470 € — Gebrauchtwagen" — vezmi časť pred "für"
+      const tabTitle = document.title.split(/\s+für\s+/)[0].trim();
+      if (tabTitle && tabTitle.length > 3 && tabTitle.length < 120) {
+        data.title = tabTitle;
+      }
+    }
 
-    // Price — try multiple selectors
-    const priceText =
-      document.querySelector('[data-testid="vip-price"]')?.textContent ||
-      document.querySelector('.price-block')?.textContent ||
-      document.querySelector('[class*="price"]')?.textContent || '';
-    const priceMatch = priceText.replace(/\./g, '').match(/(\d+[\d\s]*)\s*€/);
-    if (priceMatch) {
-      data.price_eur = parseInt(priceMatch[1].replace(/\s/g, ''), 10);
+    // Price — try multiple sources, including title parse
+    let price = null;
+    // From document.title "BMW 318 für 37.470 € — ..."
+    const titleMatch = document.title.match(/für\s+([\d.,\s]+)\s*€/);
+    if (titleMatch) {
+      price = parseInt(titleMatch[1].replace(/[.,\s]/g, ''), 10);
+    }
+    // From DOM selectors
+    if (!price) {
+      const priceText =
+        document.querySelector('[data-testid="vip-price"]')?.textContent ||
+        document.querySelector('[data-testid="prime-price"]')?.textContent ||
+        document.querySelector('.price-block')?.textContent ||
+        document.querySelector('[class*="PriceLabel"]')?.textContent || '';
+      const priceMatch = priceText.replace(/\./g, '').replace(/,/g, '').match(/(\d{4,7})\s*€/);
+      if (priceMatch) price = parseInt(priceMatch[1], 10);
+    }
+    if (price && price > 100 && price < 1000000) {
+      data.price_eur = price;
     }
 
     // Spec table — dl dt/dd pattern
