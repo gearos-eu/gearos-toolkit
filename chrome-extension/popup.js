@@ -247,22 +247,38 @@ function buildDescription(listing, price, vatMode) {
   return lines.join('\n');
 }
 
-// Resize image to target width via canvas, return JPEG dataURL
+// Resize image to target width via canvas, return JPEG dataURL.
+// NEVER throws — returns null on any failure so downstream Promise.all doesn't reject.
 async function resizeImage(srcDataUrl, targetW, quality = 0.82) {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
+    if (!srcDataUrl || typeof srcDataUrl !== 'string' || !srcDataUrl.startsWith('data:image/')) {
+      console.warn('[GearOS] resizeImage: invalid input');
+      return resolve(null);
+    }
     const img = new Image();
     img.onload = () => {
-      const ratio = img.naturalHeight / img.naturalWidth;
-      const w = targetW;
-      const h = Math.round(w * ratio);
-      const canvas = document.createElement('canvas');
-      canvas.width = w;
-      canvas.height = h;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0, w, h);
-      resolve(canvas.toDataURL('image/jpeg', quality));
+      try {
+        if (!img.naturalWidth || !img.naturalHeight) return resolve(null);
+        const ratio = img.naturalHeight / img.naturalWidth;
+        const w = targetW;
+        const h = Math.round(w * ratio);
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        const out = canvas.toDataURL('image/jpeg', quality);
+        if (!out || !out.startsWith('data:image/jpeg') || out.length < 100) return resolve(null);
+        resolve(out);
+      } catch (e) {
+        console.warn('[GearOS] resize failed:', e.message);
+        resolve(null);
+      }
     };
-    img.onerror = reject;
+    img.onerror = () => {
+      console.warn('[GearOS] image load failed');
+      resolve(null);
+    };
     img.src = srcDataUrl;
   });
 }
@@ -300,18 +316,22 @@ async function downloadPhotos(urls) {
   if (valid.length === 0) return { hero: null, exterior: [], interior: [] };
 
   console.log('[GearOS] Resizing photos for PDF...');
-  // Resize: hero 900px, gallery 480px (matches PDF column widths)
   const heroSrc = valid[0]?.dataUrl;
   const ext = [valid[1], valid[2]].filter(Boolean).map(v => v.dataUrl);
-  const intr = [valid[5], valid[7]].filter(Boolean).map(v => v.dataUrl).slice(0, 2);
+  const intr = [valid[5], valid[7]].filter(Boolean).map(v => v.dataUrl);
 
-  const [hero, exterior, interior] = await Promise.all([
+  const [heroResized, extResized, intrResized] = await Promise.all([
     heroSrc ? resizeImage(heroSrc, 900, 0.85) : null,
     Promise.all(ext.map(d => resizeImage(d, 480, 0.82))),
     Promise.all(intr.map(d => resizeImage(d, 480, 0.82))),
   ]);
 
-  return { hero, exterior, interior };
+  // Filter null/undefined — only valid dataURLs pass through to pdfmake
+  return {
+    hero: (heroResized && heroResized.startsWith('data:image/')) ? heroResized : null,
+    exterior: extResized.filter(d => d && d.startsWith('data:image/')),
+    interior: intrResized.filter(d => d && d.startsWith('data:image/')).slice(0, 2),
+  };
 }
 
 async function buildPDF(v, vatMode, photos) {
