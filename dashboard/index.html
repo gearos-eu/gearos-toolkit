@@ -258,7 +258,7 @@ tr:hover td{background:var(--surface2)}
         <div class="skill-card">
           <div class="skill-header"><div class="skill-icon">📄</div><span class="skill-tier tier-starter">Starter</span></div>
           <div class="skill-name">Vehicle Doc Generator</div>
-          <div class="skill-desc">Vygeneruje brandovanú PDF ponuku z URL inzerátu. Automaticky vypočíta predajnú cenu.</div>
+          <div class="skill-desc">Vygeneruje brandovanú PDF ponuku z textového popisu auta + predajnej ceny. Mobile.de URL zatial nepodporuje — pozri Phase 2.</div>
           <button class="skill-run-btn" onclick="openRunner('vehicle-doc-generator')">▶ Spustiť</button>
         </div>
         <div class="skill-card">
@@ -788,6 +788,16 @@ async function runSkill(){
         try { vehData = JSON.parse(jsonMatch[0]); }
         catch(e){
           termLine(term, '<span class="t-red">❌ Neplatný JSON z API: '+e.message+'</span>');
+          return;
+        }
+
+        // Claude vrátil error JSON (napr. dostal iba URL bez popisu)
+        if(vehData.error){
+          termLine(term, '<span class="t-red">⚠️ '+(vehData.message || vehData.error)+'</span>');
+          termLine(term, '');
+          termLine(term, '<span class="t-dim">Príklad správneho popisu:</span>');
+          termLine(term, '<span class="t-white">BMW 320d xDrive 2023, 51000 km, automatik 8-st, koža Vernasca,</span>');
+          termLine(term, '<span class="t-white">navi Professional, LED, parkovacie senzory, bez nehody, servis BMW.</span>');
           return;
         }
 
