@@ -171,8 +171,16 @@ async function generatePDF() {
   const price = parseInt(document.getElementById('selling-price').value || '0', 10);
   const vatMode = document.getElementById('vat-mode').value;
 
+  console.log('[GearOS] generatePDF start', { price, vatMode, listing: !!CURRENT_LISTING });
+
   if (!price || price < 100) {
     status.textContent = 'Zadaj predajnú cenu';
+    status.className = 'status err';
+    return;
+  }
+
+  if (!CURRENT_LISTING) {
+    status.textContent = '❌ Žiadne dáta — najprv klikni "Vygeneruj PDF" tlačidlo na mobile.de stránke';
     status.className = 'status err';
     return;
   }
@@ -182,8 +190,8 @@ async function generatePDF() {
   status.className = 'status';
 
   try {
-    // Build a clean description for Claude from scraped data
     const desc = buildDescription(CURRENT_LISTING, price, vatMode);
+    console.log('[GearOS] Sending to Claude, desc length:', desc.length);
 
     const res = await fetch(`${API_BASE}/skill/vehicle-doc-generator`, {
       method: 'POST',
@@ -191,27 +199,29 @@ async function generatePDF() {
       body: JSON.stringify({ input: desc, license_key: CURRENT_LICENSE.key }),
     });
     const data = await res.json();
-    if (data.error) throw new Error(data.error + ': ' + JSON.stringify(data.detail).slice(0, 100));
+    console.log('[GearOS] Claude response:', data);
+    if (data.error) throw new Error('API: ' + data.error);
 
     const jsonMatch = data.output.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error('Claude nevrátil JSON');
+    if (!jsonMatch) throw new Error('Claude nevrátil JSON. Output: ' + (data.output || '').slice(0, 100));
     const vehData = JSON.parse(jsonMatch[0]);
+    console.log('[GearOS] Parsed vehData:', vehData);
     if (vehData.error) throw new Error(vehData.message || vehData.error);
 
-    // Use our price, not Claude's
     vehData.price_value_eur = price;
 
-    status.textContent = 'Sťahujem fotky...';
+    status.textContent = 'Sťahujem fotky (môže trvať 5-10s)...';
     const photos = await downloadPhotos(CURRENT_LISTING.images || []);
-    console.log('[GearOS] Photos:', { hero: !!photos.hero, ext: photos.exterior.length, int: photos.interior.length });
+    console.log('[GearOS] Photos downloaded:', { hero: !!photos.hero, ext: photos.exterior.length, int: photos.interior.length });
 
     status.textContent = 'Generujem PDF...';
     const filename = await buildPDF(vehData, vatMode, photos);
+    console.log('[GearOS] PDF saved:', filename);
     status.textContent = '✅ PDF stiahnuté: ' + filename;
     status.className = 'status ok';
   } catch (e) {
-    console.error('[GearOS]', e);
-    status.textContent = '❌ ' + e.message;
+    console.error('[GearOS] PDF generation failed:', e);
+    status.textContent = '❌ ' + (e.message || String(e));
     status.className = 'status err';
   } finally {
     btn.disabled = false;
