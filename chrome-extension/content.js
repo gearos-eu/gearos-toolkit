@@ -143,8 +143,9 @@
   }
 
   async function downloadAndResizePhotos(urls) {
-    const candidates = urls.slice(0, 8).map(u => u.includes('?') ? u : u + '?rule=mo-720');
-    console.log('[GearOS] Fetching', candidates.length, 'photos. First:', candidates[0]?.slice(-80));
+    // Use URLs exactly as found in DOM (preserves any signing/token)
+    const candidates = urls.slice(0, 8);
+    console.log('[GearOS] Fetching', candidates.length, 'photos. First:', candidates[0]?.slice(-100));
 
     const raw = await Promise.all(candidates.map(fetchAsDataURL));
     const ok = raw.map((d, i) => d ? { idx: i, dataUrl: d } : null).filter(Boolean);
@@ -229,15 +230,28 @@
       .slice(0, 40);
     data.equipment = [...new Set(equip)];
 
-    // Images — collect all classistatic URLs, strip query string
+    // Images — capture FULL URLs including query strings (mobile.de often signs URLs)
     const imageUrls = new Set();
-    const imgPath = /https:\/\/[\w-]+\.classistatic\.de\/api\/v1\/mo-prod\/images\/[\w/-]+/g;
-    // Search whole DOM HTML (catches lazy-loaded data-src, srcset, srcSet, etc.)
+    // Match full URL including query params, stop at quote/space/<
+    const imgRe = /https:\/\/[\w-]+\.classistatic\.de\/api\/v1\/mo-prod\/images\/[^\s"'<>]+/g;
     const html = document.documentElement.outerHTML;
-    const matches = html.match(imgPath) || [];
-    matches.forEach(m => imageUrls.add(m));
-    data.images = [...imageUrls].slice(0, 12);
-    console.log('[GearOS] Images found:', data.images.length);
+    const matches = html.match(imgRe) || [];
+    // Dedupe by image ID (path before query string)
+    const byId = new Map();
+    matches.forEach(m => {
+      const idMatch = m.match(/images\/([\w/-]+)/);
+      if (!idMatch) return;
+      const id = idMatch[1];
+      // Prefer higher-quality version (mo-720 > mo-360 > mo-160)
+      const existing = byId.get(id);
+      const newRule = (m.match(/mo-(\d+)/) || [])[1] || '0';
+      const oldRule = existing ? ((existing.match(/mo-(\d+)/) || [])[1] || '0') : '0';
+      if (!existing || parseInt(newRule) > parseInt(oldRule)) {
+        byId.set(id, m);
+      }
+    });
+    data.images = [...byId.values()].slice(0, 12);
+    console.log('[GearOS] Images found:', data.images.length, 'sample:', data.images[0]?.slice(-100));
 
     // VIN
     const vinMatch = (document.body.innerText || '').match(/\b[A-HJ-NPR-Z0-9]{17}\b/);
