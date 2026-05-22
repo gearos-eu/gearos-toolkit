@@ -243,19 +243,38 @@ function buildDescription(listing, price, vatMode) {
   return lines.join('\n');
 }
 
+// Resize image to target width via canvas, return JPEG dataURL
+async function resizeImage(srcDataUrl, targetW, quality = 0.82) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const ratio = img.naturalHeight / img.naturalWidth;
+      const w = targetW;
+      const h = Math.round(w * ratio);
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = reject;
+    img.src = srcDataUrl;
+  });
+}
+
 // Download images from classistatic CDN and convert to base64 dataURLs.
-// Mobile.de gallery: first photos are usually exterior, interior comes later.
 async function downloadPhotos(urls) {
   if (!urls || !urls.length) return { hero: null, exterior: [], interior: [] };
 
-  // Convert listing URLs (which lack rule param) to rule=mo-1024 for size balance
+  // Smaller rule = smaller files = faster everything
   const fullUrls = urls.map(u => {
     if (u.includes('?')) return u;
-    return u + '?rule=mo-1024';
+    return u + '?rule=mo-720';  // ~720px wide source
   });
 
-  // Take first 5 as candidate (mobile.de typically orders exterior first)
   const candidates = fullUrls.slice(0, Math.min(8, fullUrls.length));
+  console.log('[GearOS] Downloading', candidates.length, 'photos');
 
   const results = await Promise.all(candidates.map(async (url) => {
     try {
@@ -264,7 +283,7 @@ async function downloadPhotos(urls) {
       const blob = await res.blob();
       return await new Promise(r => {
         const fr = new FileReader();
-        fr.onload = () => r({ url, dataUrl: fr.result, size: blob.size });
+        fr.onload = () => r({ url, dataUrl: fr.result });
         fr.readAsDataURL(blob);
       });
     } catch (e) {
@@ -276,13 +295,19 @@ async function downloadPhotos(urls) {
   const valid = results.filter(Boolean);
   if (valid.length === 0) return { hero: null, exterior: [], interior: [] };
 
-  // Heuristic: first 3 photos = exterior, photos[5] and photos[7] = interior
-  // (mobile.de gallery convention; user can override later)
-  return {
-    hero: valid[0]?.dataUrl || null,
-    exterior: [valid[1], valid[2]].filter(Boolean).map(v => v.dataUrl),
-    interior: [valid[5], valid[7]].filter(Boolean).map(v => v.dataUrl).slice(0, 2),
-  };
+  console.log('[GearOS] Resizing photos for PDF...');
+  // Resize: hero 900px, gallery 480px (matches PDF column widths)
+  const heroSrc = valid[0]?.dataUrl;
+  const ext = [valid[1], valid[2]].filter(Boolean).map(v => v.dataUrl);
+  const intr = [valid[5], valid[7]].filter(Boolean).map(v => v.dataUrl).slice(0, 2);
+
+  const [hero, exterior, interior] = await Promise.all([
+    heroSrc ? resizeImage(heroSrc, 900, 0.85) : null,
+    Promise.all(ext.map(d => resizeImage(d, 480, 0.82))),
+    Promise.all(intr.map(d => resizeImage(d, 480, 0.82))),
+  ]);
+
+  return { hero, exterior, interior };
 }
 
 async function buildPDF(v, vatMode, photos) {
