@@ -4,11 +4,13 @@
 (function() {
   'use strict';
 
+  console.log('[GearOS] Content script loaded on', location.href);
+
   // Only run on listing detail pages — but try multiple URL patterns
   const isDetailPage = /\/fahrzeuge\/details\.html\?id=\d+|\/auto\/details\.html\?id=\d+/.test(location.href);
 
   if (!isDetailPage) {
-    console.log('[GearOS] Nie je detail page, content script sa nespúšťa. URL:', location.href);
+    console.log('[GearOS] Nie je detail page — tlačidlo sa nepridá. Očakávam URL s /fahrzeuge/details.html?id=...');
     return;
   }
 
@@ -38,16 +40,36 @@
 
     const btn = document.createElement('button');
     btn.id = 'gearos-fab';
-    btn.innerHTML = `
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-        <polyline points="14 2 14 8 20 8"/>
-      </svg>
-      Vygeneruj GearOS PDF
-    `;
+    // Inline styles to override mobile.de CSS (CSS file load might be blocked/overridden)
+    btn.setAttribute('style', `
+      position: fixed !important;
+      bottom: 24px !important;
+      right: 24px !important;
+      background: #2563eb !important;
+      color: white !important;
+      border: none !important;
+      border-radius: 999px !important;
+      padding: 14px 22px !important;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+      font-size: 14px !important;
+      font-weight: 600 !important;
+      cursor: pointer !important;
+      box-shadow: 0 4px 16px rgba(0,0,0,.35) !important;
+      z-index: 2147483647 !important;
+      display: flex !important;
+      align-items: center !important;
+      gap: 8px !important;
+      visibility: visible !important;
+      opacity: 1 !important;
+      pointer-events: auto !important;
+      line-height: 1 !important;
+      text-transform: none !important;
+      letter-spacing: normal !important;
+    `.replace(/\s+/g, ' '));
+    btn.textContent = '⚡ Vygeneruj GearOS PDF';
     btn.addEventListener('click', onClick);
     document.body.appendChild(btn);
-    console.log('[GearOS] Button injected.');
+    console.log('[GearOS] Button injected at', new Date().toISOString());
   }
 
   async function onClick() {
