@@ -17,16 +17,20 @@
   // Inject button immediately — don't wait for DOM elements
   injectButton();
 
-  // Watch for DOM changes (mobile.de is SPA)
-  const observer = new MutationObserver(() => {
-    if (!document.getElementById('gearos-fab')) {
+  // Watch for DOM changes (mobile.de is SPA, may remove our button)
+  if (document.body) {
+    const observer = new MutationObserver(() => {
+      if (!document.getElementById('gearos-fab')) injectButton();
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+  }
+
+  // Belt + suspenders: also check every 2s for the lifetime of the page
+  setInterval(() => {
+    if (document.body && !document.getElementById('gearos-fab')) {
       injectButton();
     }
-  });
-  observer.observe(document.body, { childList: true, subtree: true });
-
-  // Stop observing after 30s (no point watching forever)
-  setTimeout(() => observer.disconnect(), 30000);
+  }, 2000);
 
   function injectButton() {
     if (document.getElementById('gearos-fab')) return;
