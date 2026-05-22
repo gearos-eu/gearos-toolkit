@@ -291,8 +291,17 @@ async function buildPDF(v, vatMode, photos) {
   const subtitle = [COMPANY.name, COMPANY.city, COMPANY.email, COMPANY.phone].filter(Boolean).join(' · ');
 
   let vatLine = '';
-  if (vatMode === 'margin') vatLine = 'Cena vrátane DPH v režime prirážky podľa § 25a zákona o DPH.';
-  else if (vatMode === 'vat') vatLine = 'Cena vrátane DPH 23%.';
+  let priceWithoutVat = null;
+  let vatAmount = null;
+  if (vatMode === 'margin') {
+    vatLine = 'Cena vrátane DPH v režime prirážky podľa § 25a zákona o DPH.';
+  } else if (vatMode === 'vat') {
+    // Selling price IS with VAT — calculate the breakdown
+    const priceWith = v.price_value_eur || 0;
+    priceWithoutVat = Math.round(priceWith / 1.23);
+    vatAmount = priceWith - priceWithoutVat;
+    vatLine = 'Cena vrátane DPH 23%.';
+  }
 
   // Reusable header block
   const headerBlock = [
@@ -333,16 +342,26 @@ async function buildPDF(v, vatMode, photos) {
     { ul: v.selling_points || [], style: 'pointsList', margin: [0, 10, 0, 0] },
   );
 
-  // Price box
+  // Price box — VAT breakdown only for 'vat' mode (s odpočtom DPH)
+  const priceStack = [
+    { text: (v.price_label || 'PREDAJNÁ CENA').toUpperCase(), style: 'priceLabel' },
+    { text: price + ' €', style: 'priceValue' },
+  ];
+  if (priceWithoutVat !== null) {
+    priceStack.push({
+      text: `Cena bez DPH: ${priceWithoutVat.toLocaleString('sk-SK')} €  ·  DPH 23%: ${vatAmount.toLocaleString('sk-SK')} €`,
+      style: 'priceBreakdown',
+      margin: [0, 6, 0, 0],
+    });
+  }
+  if (vatLine) {
+    priceStack.push({ text: vatLine, style: 'priceNote', margin: [0, priceWithoutVat !== null ? 2 : 4, 0, 0] });
+  }
   content.push({
     table: {
       widths: ['*'],
       body: [[{
-        stack: [
-          { text: (v.price_label || 'PREDAJNÁ CENA').toUpperCase(), style: 'priceLabel' },
-          { text: price + ' €', style: 'priceValue' },
-          vatLine ? { text: vatLine, style: 'priceNote', margin: [0, 4, 0, 0] } : '',
-        ],
+        stack: priceStack,
         fillColor: '#1a1a2e', color: '#ffffff',
         border: [false, false, false, false],
         margin: [16, 14, 16, 14],
@@ -449,6 +468,7 @@ async function buildPDF(v, vatMode, photos) {
       equipList: { fontSize: 9.5, color: '#1a1a2e', lineHeight: 1.4 },
       priceLabel: { fontSize: 10, color: '#cccccc', characterSpacing: 2 },
       priceValue: { fontSize: 30, bold: true, color: '#ffffff', margin: [0, 4, 0, 0] },
+      priceBreakdown: { fontSize: 10, color: '#e5e7eb' },
       priceNote: { fontSize: 9, color: '#cccccc', italics: true },
       footerNote: { fontSize: 10, italics: true, color: '#6b7280' },
       contactName: { fontSize: 11, bold: true, color: '#1a1a2e', lineHeight: 1.3 },
