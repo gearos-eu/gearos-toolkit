@@ -432,9 +432,9 @@ function showPage(id, el){
 const SKILL_META = {
   'car-listing-scanner':          {icon:'🔍', title:'Car Listing Scanner',         ph:'Napr: VW Golf diesel, BMW 3er, Škoda Octavia...'},
   'competitor-pricing-monitor':   {icon:'📊', title:'Competitor Pricing Monitor',  ph:'Napr: BMW 320d 2023, VW Passat diesel...'},
-  'b2b-outreach-generator':       {icon:'✉️', title:'B2B Outreach Generator',      ph:'Napr: Autohaus Müller Hamburg, WELLER Premium...'},
-  'inquiry-classifier':           {icon:'📩', title:'Inquiry Classifier',          ph:'Sem vložte text dopytu od zákazníka...'},
-  'vehicle-doc-generator':        {icon:'📄', title:'Vehicle Doc Generator',       ph:'URL z mobile.de alebo napr: BMW 320d 2023 51tkm...'},
+  'b2b-outreach-generator':       {icon:'✉️', title:'B2B Outreach Generator',      ph:'Napr: Autohaus Müller, Hamburg, ponúkam VW Golf 2.0 TDI 2022, 54tkm, 16.800€'},
+  'inquiry-classifier':           {icon:'📩', title:'Inquiry Classifier',          ph:'Vlož celý text dopytu od zákazníka (email/SMS/správa)...'},
+  'vehicle-doc-generator':        {icon:'📄', title:'Vehicle Doc Generator',       ph:'Napr: BMW 320d 2023, 51tkm, automatik, kožené sedadlá, predajná cena 28900€'},
   'linkedin-prospector':          {icon:'💼', title:'LinkedIn Prospector',         ph:'Napr: Autohaus München, Premium Cars DE...'},
   'daily-digest':                 {icon:'📋', title:'Daily Digest',                ph:'(stlačte Spustiť pre dnešný prehľad)'},
   'contact-deduplicator':         {icon:'🧹', title:'Contact Deduplicator',        ph:'(stlačte Spustiť pre analýzu kontaktov)'},
@@ -586,22 +586,104 @@ const OUTPUTS = {
 };
 
 let typeInterval = null;
-function runSkill(){
+
+// Skills ktoré volajú real Claude API (cez Worker proxy)
+const LIVE_SKILLS = ['inquiry-classifier','b2b-outreach-generator','vehicle-doc-generator'];
+
+// Skills ktoré pôjdu len cez Claude Code desktop
+const DESKTOP_ONLY = ['car-listing-scanner','competitor-pricing-monitor','linkedin-prospector','daily-digest','contact-deduplicator'];
+
+function termLine(term, html){
+  const div = document.createElement('div');
+  div.innerHTML = html || '&nbsp;';
+  term.appendChild(div);
+  term.scrollTop = term.scrollHeight;
+}
+
+async function runSkill(){
   const q = document.getElementById('runner-input').value.trim();
   const term = document.getElementById('terminal');
   term.innerHTML = '';
   if(typeInterval) clearInterval(typeInterval);
 
-  const lines = (OUTPUTS[currentSkill] || OUTPUTS['car-listing-scanner'])(q);
-  let i = 0;
-  typeInterval = setInterval(()=>{
-    if(i >= lines.length){ clearInterval(typeInterval); return; }
-    const div = document.createElement('div');
-    div.innerHTML = lines[i][0] || '&nbsp;';
-    term.appendChild(div);
-    term.scrollTop = term.scrollHeight;
-    i++;
-  }, 60);
+  // Real Claude API call
+  if(LIVE_SKILLS.includes(currentSkill)){
+    if(!q){
+      termLine(term, '<span class="t-dim">// Zadajte vstup a stlačte Spustiť.</span>');
+      return;
+    }
+    termLine(term, '<span class="t-dim">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</span>');
+    termLine(term, '<span class="t-accent">GearOS</span> <span class="t-dim">·</span> <span class="t-white">'+SKILL_META[currentSkill].title+'</span> <span class="t-green">[LIVE]</span>');
+    termLine(term, '<span class="t-dim">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</span>');
+    termLine(term, '<span class="t-dim">Posielam na Claude API...</span>');
+
+    try {
+      const t0 = Date.now();
+      const res = await fetch(`${API_BASE}/skill/${currentSkill}`, {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({input: q, license_key: CURRENT_LICENSE?.key}),
+      });
+      const data = await res.json();
+      const ms = Date.now() - t0;
+
+      if(data.error){
+        termLine(term, '<span class="t-red">❌ Chyba: '+(data.error)+'</span>');
+        if(data.detail) termLine(term, '<span class="t-dim">'+JSON.stringify(data.detail).substring(0,200)+'</span>');
+        return;
+      }
+
+      termLine(term, '<span class="t-dim">Odpoveď za '+ms+'ms · '+(data.usage?.input_tokens||0)+' in / '+(data.usage?.output_tokens||0)+' out tokens</span>');
+      termLine(term, '');
+      termLine(term, '<span class="t-dim">──── Výsledok ──────────────────────────────</span>');
+
+      // Render output line by line s minimálnou animáciou
+      const text = data.output || '(prázdna odpoveď)';
+      const outLines = text.split('\n');
+      let i = 0;
+      typeInterval = setInterval(()=>{
+        if(i >= outLines.length){
+          clearInterval(typeInterval);
+          termLine(term, '<span class="t-dim">──────────────────────────────────────────</span>');
+          return;
+        }
+        const safe = outLines[i].replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        termLine(term, '<span class="t-white">'+safe+'</span>');
+        i++;
+      }, 25);
+    } catch(e){
+      termLine(term, '<span class="t-red">❌ Chyba siete: '+e.message+'</span>');
+    }
+    return;
+  }
+
+  // Desktop-only skills — show explanation, no fake output
+  if(DESKTOP_ONLY.includes(currentSkill)){
+    termLine(term, '<span class="t-dim">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</span>');
+    termLine(term, '<span class="t-accent">GearOS</span> <span class="t-dim">·</span> <span class="t-white">'+SKILL_META[currentSkill].title+'</span> <span class="t-yellow">[DESKTOP]</span>');
+    termLine(term, '<span class="t-dim">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</span>');
+    termLine(term, '');
+    termLine(term, '<span class="t-white">Tento skill vyžaduje prístup k:</span>');
+    if(currentSkill==='car-listing-scanner' || currentSkill==='competitor-pricing-monitor'){
+      termLine(term, '<span class="t-dim">  · mobile.de + autoscout24 (browser automation)</span>');
+    } else if(currentSkill==='daily-digest'){
+      termLine(term, '<span class="t-dim">  · Gmail (čítanie inboxu)</span>');
+      termLine(term, '<span class="t-dim">  · Lokálny B2B xlsx súbor</span>');
+    } else if(currentSkill==='linkedin-prospector'){
+      termLine(term, '<span class="t-dim">  · LinkedIn (aktívna session)</span>');
+    } else if(currentSkill==='contact-deduplicator'){
+      termLine(term, '<span class="t-dim">  · Lokálny xlsx súbor</span>');
+    }
+    termLine(term, '');
+    termLine(term, '<span class="t-white">Preto sa spúšta cez Claude Code na desktope:</span>');
+    termLine(term, '<span class="t-accent">  /'+currentSkill+'</span>');
+    termLine(term, '');
+    termLine(term, '<span class="t-dim">Setup: https://github.com/gearos-eu/gearos-toolkit#install</span>');
+    return;
+  }
+
+  // Fallback (nemalo by sa stať)
+  termLine(term, '<span class="t-red">Neznámy skill: '+currentSkill+'</span>');
 }
 
 function saveSettings(){

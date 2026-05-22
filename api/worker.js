@@ -43,7 +43,103 @@ export default {
       return handleStripeWebhook(request, env, headers)
     }
 
+    if (request.method === 'POST' && url.pathname.startsWith('/skill/')) {
+      const skillName = url.pathname.slice('/skill/'.length)
+      return handleSkill(skillName, request, env, headers)
+    }
+
     return new Response(JSON.stringify({ status: 'GearOS License API v1' }), { headers })
+  }
+}
+
+// ─── SKILL PROXY (Claude API) ────────────────────────────────────────────────
+
+const SKILL_PROMPTS = {
+  'inquiry-classifier': {
+    system: `Si asistent v autosalóne. Klasifikuj zákaznícky dopyt do JSON formátu.
+Vráť LEN JSON, žiadny iný text.
+
+Schema:
+{
+  "type": "price_request" | "availability" | "test_drive" | "financing" | "trade_in" | "general",
+  "language": "sk" | "cs" | "de" | "en" | "hu" | "pl",
+  "urgency": "high" | "medium" | "low",
+  "summary": "1-2 vety zhrnutie čo zákazník chce",
+  "suggested_reply": "návrh odpovede v jazyku zákazníka, 80-150 slov, profesionálne ale ľudsky"
+}`,
+    user: (input) => `Dopyt od zákazníka:\n\n${input}`,
+  },
+  'b2b-outreach-generator': {
+    system: `Si B2B asistent pre slovenský autosalón ktorý exportuje auta nemeckým dealerom.
+Napíš krátky (120-180 slov) personalizovaný nemecký email na nemeckého dealera.
+Formálne "Sie". Žiadne "I hope this email finds you well" frázy.
+Konkrétne — meno dealera, model auta, ponuka.
+Vráť LEN text emailu (Betreff: + telo), žiadny iný komentár.`,
+    user: (input) => `Info o dealerovi a aute ktoré ponúkam:\n\n${input}`,
+  },
+  'vehicle-doc-generator': {
+    system: `Si asistent autosalónu. Z popisu auta vygeneruj štruktúrovaný JSON pre PDF ponuku.
+Vráť LEN JSON, žiadny iný text.
+
+Schema:
+{
+  "title": "Make Model — Variant",
+  "headline_specs": ["EZ MM/YYYY", "XX 000 km", "XXX kW (XXX PS)", "Diesel/Benzín/EV", "Automatik/Manuál"],
+  "selling_points": ["3-5 highlightov v slovenčine, krátke vety"],
+  "price_label": "Predajná cena vrátane DPH",
+  "price_value_eur": 12345,
+  "footer_note": "krátka veta dôveryhodnosti, napr. 'Servisná história, bez nehody.'"
+}`,
+    user: (input) => `Popis auta:\n\n${input}`,
+  },
+}
+
+async function handleSkill(skillName, request, env, headers) {
+  const skill = SKILL_PROMPTS[skillName]
+  if (!skill) {
+    return json({ error: 'unknown_skill', available: Object.keys(SKILL_PROMPTS) }, 404, headers)
+  }
+
+  let body
+  try { body = await request.json() } catch { return json({ error: 'invalid_json' }, 400, headers) }
+
+  const { input, license_key } = body
+  if (!input || typeof input !== 'string') {
+    return json({ error: 'missing_input' }, 400, headers)
+  }
+
+  // Optional: validate license (skip for now during testing — add later)
+  // if (!license_key) return json({ error: 'missing_license' }, 401, headers)
+
+  try {
+    const claudeRes = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': env.ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-5',
+        max_tokens: 1500,
+        system: skill.system,
+        messages: [{ role: 'user', content: skill.user(input) }],
+      }),
+    })
+
+    const data = await claudeRes.json()
+    if (data.error) {
+      return json({ error: 'claude_api_error', detail: data.error }, 500, headers)
+    }
+
+    const text = data.content?.[0]?.text || ''
+    return json({
+      skill: skillName,
+      output: text,
+      usage: data.usage,
+    }, 200, headers)
+  } catch (e) {
+    return json({ error: 'fetch_failed', detail: String(e) }, 500, headers)
   }
 }
 
