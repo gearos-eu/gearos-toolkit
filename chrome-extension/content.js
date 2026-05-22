@@ -59,13 +59,26 @@
         throw new Error('Stránka ešte nie je načítaná. Počkaj 3s a skús znova.');
       }
 
+      // Download photos on the mobile.de page (origin lets it through)
+      if (data.images && data.images.length > 0) {
+        btn.innerHTML = `📷 Sťahujem ${Math.min(8, data.images.length)} fotiek...`;
+        data.photos_b64 = await downloadAndResizePhotos(data.images);
+        console.log('[GearOS] Photos downloaded:', {
+          hero: !!data.photos_b64.hero,
+          ext: data.photos_b64.exterior.length,
+          int: data.photos_b64.interior.length,
+        });
+      } else {
+        data.photos_b64 = { hero: null, exterior: [], interior: [] };
+      }
+
       await chrome.storage.local.set({ pendingListing: data });
-      btn.innerHTML = '✅ Údaje uložené';
+      btn.innerHTML = '✅ Údaje + fotky pripravené';
 
       setTimeout(() => {
         btn.classList.remove('loading');
         btn.innerHTML = '🚀 Klikni ikonu GearOS hore →';
-      }, 1200);
+      }, 1500);
     } catch (e) {
       console.error('[GearOS] Error:', e);
       btn.classList.remove('loading');
@@ -80,6 +93,80 @@
         `;
       }, 4000);
     }
+  }
+
+  // ─── PHOTO DOWNLOAD (on mobile.de origin — bypasses extension CORS issues) ──
+
+  function resizeViaCanvas(srcDataUrl, targetW, quality) {
+    return new Promise(resolve => {
+      if (!srcDataUrl || !srcDataUrl.startsWith('data:image/')) return resolve(null);
+      const img = new Image();
+      img.onload = () => {
+        try {
+          if (!img.naturalWidth || !img.naturalHeight) return resolve(null);
+          const ratio = img.naturalHeight / img.naturalWidth;
+          const w = targetW;
+          const h = Math.round(w * ratio);
+          const c = document.createElement('canvas');
+          c.width = w; c.height = h;
+          c.getContext('2d').drawImage(img, 0, 0, w, h);
+          const out = c.toDataURL('image/jpeg', quality);
+          resolve(out && out.length > 100 ? out : null);
+        } catch (e) {
+          console.warn('[GearOS] resize fail:', e.message);
+          resolve(null);
+        }
+      };
+      img.onerror = () => resolve(null);
+      img.src = srcDataUrl;
+    });
+  }
+
+  async function fetchAsDataURL(url) {
+    try {
+      const res = await fetch(url, { credentials: 'omit' });
+      if (!res.ok) {
+        console.warn('[GearOS] fetch failed', res.status, url.slice(-50));
+        return null;
+      }
+      const blob = await res.blob();
+      return await new Promise(r => {
+        const fr = new FileReader();
+        fr.onload = () => r(fr.result);
+        fr.onerror = () => r(null);
+        fr.readAsDataURL(blob);
+      });
+    } catch (e) {
+      console.warn('[GearOS] fetch threw:', e.message);
+      return null;
+    }
+  }
+
+  async function downloadAndResizePhotos(urls) {
+    const candidates = urls.slice(0, 8).map(u => u.includes('?') ? u : u + '?rule=mo-720');
+    console.log('[GearOS] Fetching', candidates.length, 'photos. First:', candidates[0]?.slice(-80));
+
+    const raw = await Promise.all(candidates.map(fetchAsDataURL));
+    const ok = raw.map((d, i) => d ? { idx: i, dataUrl: d } : null).filter(Boolean);
+    console.log('[GearOS] Fetched OK:', ok.length, '/', candidates.length);
+
+    if (ok.length === 0) return { hero: null, exterior: [], interior: [] };
+
+    const heroSrc = ok[0].dataUrl;
+    const extSrc = [ok[1]?.dataUrl, ok[2]?.dataUrl].filter(Boolean);
+    const intSrc = [ok[5]?.dataUrl, ok[7]?.dataUrl].filter(Boolean);
+
+    const [hero, exterior, interior] = await Promise.all([
+      resizeViaCanvas(heroSrc, 900, 0.85),
+      Promise.all(extSrc.map(d => resizeViaCanvas(d, 480, 0.82))),
+      Promise.all(intSrc.map(d => resizeViaCanvas(d, 480, 0.82))),
+    ]);
+
+    return {
+      hero: (hero && hero.startsWith('data:image/')) ? hero : null,
+      exterior: exterior.filter(d => d && d.startsWith('data:image/')),
+      interior: interior.filter(d => d && d.startsWith('data:image/')).slice(0, 2),
+    };
   }
 
   // ─── SCRAPER ─────────────────────────────────────────────────────────────

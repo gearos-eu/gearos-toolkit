@@ -210,12 +210,11 @@ async function generatePDF() {
 
     vehData.price_value_eur = price;
 
-    console.log('[GearOS] Listing images URLs:', CURRENT_LISTING.images?.length || 0, CURRENT_LISTING.images?.slice(0,2));
-    status.textContent = 'Sťahujem fotky (môže trvať 5-10s)...';
-    const photos = await downloadPhotos(CURRENT_LISTING.images || []);
-    console.log('[GearOS] Photos result:', { hero: !!photos.hero, ext: photos.exterior.length, int: photos.interior.length });
+    // Photos were already downloaded by content script and stored
+    const photos = CURRENT_LISTING.photos_b64 || { hero: null, exterior: [], interior: [] };
+    console.log('[GearOS] Photos from storage:', { hero: !!photos.hero, ext: photos.exterior?.length, int: photos.interior?.length });
     if (!photos.hero && (CURRENT_LISTING.images?.length || 0) > 0) {
-      console.warn('[GearOS] Photos URLs existed but all downloads failed. Check network errors above.');
+      status.textContent = '⚠️ Fotky sa nepodarilo stiahnuť — PDF bude bez fotiek';
     }
 
     status.textContent = 'Generujem PDF...';
