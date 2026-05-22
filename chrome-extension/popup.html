@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="UTF-8">
+<title>GearOS</title>
+<script src="lib/pdfmake.min.js"></script>
+<script src="lib/vfs_fonts.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0f1117;color:#e8eaf0;width:420px;padding:18px;font-size:13px}
+h1{font-size:1rem;margin-bottom:4px;display:flex;align-items:center;gap:8px}
+h1 span{color:#60a5fa}
+.sub{color:#6b7280;font-size:11px;margin-bottom:14px}
+.section{background:#1a1d27;border:1px solid #2a2e42;border-radius:8px;padding:12px;margin-bottom:10px}
+.section h2{font-size:.75rem;color:#6b7280;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px}
+.field{margin-bottom:8px}
+.field label{display:block;font-size:11px;color:#6b7280;margin-bottom:3px}
+.field input,.field select,.field textarea{width:100%;background:#0f1117;border:1px solid #2a2e42;color:#e8eaf0;padding:7px 10px;border-radius:4px;font-size:12px;font-family:inherit;outline:none}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:#2563eb}
+.field textarea{resize:vertical;min-height:60px}
+.btn{width:100%;background:#2563eb;color:white;border:none;border-radius:6px;padding:10px;font-size:13px;font-weight:600;cursor:pointer;margin-top:8px}
+.btn:hover{background:#1d4ed8}
+.btn:disabled{background:#374151;cursor:not-allowed}
+.btn-sec{background:#22263a}
+.btn-sec:hover{background:#2d3147}
+.status{font-size:11px;color:#6b7280;padding:6px 0;min-height:18px}
+.status.ok{color:#22c55e}
+.status.err{color:#ef4444}
+.specs-preview{font-size:11px;color:#9ca3af;line-height:1.5;max-height:60px;overflow-y:auto;background:#0f1117;padding:6px;border-radius:4px;margin-bottom:6px}
+.empty{text-align:center;padding:24px 12px;color:#6b7280}
+.empty .icon{font-size:32px;margin-bottom:8px;opacity:.5}
+.license-bar{display:flex;align-items:center;gap:8px;padding:8px 10px;background:#1a1d27;border:1px solid #2a2e42;border-radius:6px;margin-bottom:10px;font-size:11px}
+.license-bar .key{font-family:monospace;color:#60a5fa}
+.license-bar .tier{background:#1e3a8a;color:#93c5fd;padding:2px 6px;border-radius:10px;font-weight:600;text-transform:uppercase;font-size:9px}
+.license-bar.bad{color:#ef4444}
+</style>
+</head>
+<body>
+
+<h1>Gear<span>OS</span></h1>
+<div class="sub">Cenová ponuka PDF z mobile.de</div>
+
+<div class="license-bar" id="license-bar">
+  <span>Licencia:</span>
+  <span class="key" id="license-key">—</span>
+  <span class="tier" id="license-tier" style="display:none"></span>
+  <button class="btn-sec" style="margin-left:auto;padding:3px 8px;font-size:10px;border:none;border-radius:3px;color:#9ca3af;cursor:pointer" onclick="changeLicense()">Zmeniť</button>
+</div>
+
+<div id="no-license" style="display:none">
+  <div class="section">
+    <h2>Prvé prihlásenie</h2>
+    <div class="field">
+      <label>Tvoj GearOS licenčný kľúč</label>
+      <input id="license-input" placeholder="GEAR-XXXX-XXXX-XXXX" maxlength="19">
+    </div>
+    <button class="btn" onclick="saveLicense()">Overiť a uložiť</button>
+    <div class="status" id="license-status"></div>
+  </div>
+</div>
+
+<div id="main" style="display:none">
+
+  <div id="no-data">
+    <div class="empty">
+      <div class="icon">📋</div>
+      <div>Otvor inzerát na <strong>mobile.de</strong> a klikni tlačidlo <strong>"Vygeneruj GearOS PDF"</strong> ktoré sa zobrazí na stránke.</div>
+    </div>
+  </div>
+
+  <div id="with-data" style="display:none">
+    <div class="section">
+      <h2>Naskenované údaje</h2>
+      <div class="field">
+        <label>Auto</label>
+        <input id="data-title" readonly>
+      </div>
+      <div class="specs-preview" id="specs-preview"></div>
+      <div class="field">
+        <label>Počet fotiek</label>
+        <input id="data-images-count" readonly>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Predajné podmienky</h2>
+      <div class="field">
+        <label>Predajná cena pre zákazníka (€)</label>
+        <input id="selling-price" type="number" placeholder="napr. 28900">
+      </div>
+      <div class="field">
+        <label>DPH režim</label>
+        <select id="vat-mode">
+          <option value="margin">§ 25a — DPH v marži (ojazdené)</option>
+          <option value="vat">Štandardná DPH 23%</option>
+          <option value="none">Bez DPH info</option>
+        </select>
+      </div>
+      <button class="btn" id="generate-btn" onclick="generatePDF()">Vygenerovať PDF</button>
+      <div class="status" id="gen-status"></div>
+    </div>
+  </div>
+
+</div>
+
+<script src="popup.js"></script>
+</body>
+</html>

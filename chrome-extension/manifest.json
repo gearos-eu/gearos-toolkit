@@ -1,0 +1,39 @@
+{
+  "manifest_version": 3,
+  "name": "GearOS — Cenová ponuka z mobile.de",
+  "version": "0.1.0",
+  "description": "Vygeneruje brandovanú PDF ponuku z mobile.de inzerátu jedným klikom. Pre dealerov s GearOS licenciou.",
+  "permissions": ["storage", "activeTab", "downloads"],
+  "host_permissions": [
+    "https://*.mobile.de/*",
+    "https://suchen.mobile.de/*",
+    "https://img.classistatic.de/*",
+    "https://gearos-license-api.rybarsky.workers.dev/*",
+    "https://ykkbdhfxfqrcjkmqtqlu.supabase.co/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "GearOS",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://suchen.mobile.de/fahrzeuge/details.html*"],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}
