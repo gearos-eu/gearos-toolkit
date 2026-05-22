@@ -142,14 +142,20 @@ Vráť LEN text emailu (Betreff: + telo), žiadny iný komentár.`,
     system: `Si asistent autosalónu. Z popisu auta vygeneruj štruktúrovaný JSON pre PDF ponuku.
 Vráť LEN JSON, žiadny iný text.
 
-Schema:
+KRITICKÉ PRAVIDLO:
+- Ak vstup obsahuje IBA URL (napr. https://...mobile.de/...) alebo je príliš krátky bez popisu,
+  vráť tento error JSON: {"error": "no_description", "message": "Potrebujem textový popis auta. URL z mobile.de zatial nepodporujeme — skopíruj základné údaje (značka, model, rok, km, výkon, výbava) do popisu."}
+- NIKDY si nevymýšľaj údaje (značku, model, rok, výkon, farbu, výbavu) ak nie sú v texte.
+- Ak v texte chýba dôležitý údaj, môžeš ho vynechať z JSON, ale NIKDY ho neuhádni.
+
+Schema (keď je popis OK):
 {
-  "title": "Make Model — Variant",
-  "headline_specs": ["EZ MM/YYYY", "XX 000 km", "XXX kW (XXX PS)", "Diesel/Benzín/EV", "Automatik/Manuál"],
-  "selling_points": ["3-5 highlightov v slovenčine, krátke vety"],
+  "title": "Make Model — Variant (presne ako v texte)",
+  "headline_specs": ["len údaje ktoré sú v texte"],
+  "selling_points": ["3-5 krátkych viet zo skutočných údajov v texte"],
   "price_label": "Predajná cena vrátane DPH",
-  "price_value_eur": 12345,
-  "footer_note": "krátka veta dôveryhodnosti, napr. 'Servisná história, bez nehody.'"
+  "price_value_eur": <číslo z textu>,
+  "footer_note": "krátka veta na základe údajov v texte"
 }`,
     user: (input) => `Popis auta:\n\n${input}`,
   },
