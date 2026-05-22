@@ -104,8 +104,8 @@ main{flex:1;overflow-y:auto;background:var(--bg)}
 .runner-title{font-size:1rem;font-weight:600}
 .runner-close{background:none;border:none;color:var(--muted);font-size:1.2rem;cursor:pointer;padding:4px}
 .runner-close:hover{color:var(--text)}
-.runner-input-row{padding:16px 24px;border-bottom:1px solid var(--border);display:flex;gap:12px}
-.runner-input{flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:10px 14px;color:var(--text);font-size:.875rem;outline:none}
+.runner-input-row{padding:16px 24px;border-bottom:1px solid var(--border);display:flex;gap:12px;align-items:flex-start}
+.runner-input{flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:10px 14px;color:var(--text);font-size:.875rem;outline:none;resize:vertical;min-height:42px;max-height:240px;font-family:inherit;line-height:1.5;word-break:break-all}
 .runner-input:focus{border-color:var(--accent)}
 .runner-go{background:var(--accent);color:white;border:none;border-radius:6px;padding:10px 20px;font-size:.875rem;font-weight:600;cursor:pointer}
 .runner-go:hover{background:#1d4ed8}
@@ -361,7 +361,7 @@ tr:hover td{background:var(--surface2)}
       <button class="runner-close" onclick="closeRunner()">✕</button>
     </div>
     <div class="runner-input-row">
-      <input class="runner-input" id="runner-input" placeholder="Napr: BMW 3er diesel, VW Golf 2020, Škoda Octavia..." onkeydown="if(event.key==='Enter')runSkill()">
+      <textarea class="runner-input" id="runner-input" placeholder="Napr: BMW 3er diesel, VW Golf 2020, Škoda Octavia..." rows="2" oninput="autosize(this)" onkeydown="if(event.key==='Enter' && (event.ctrlKey||event.metaKey)){event.preventDefault();runSkill()}"></textarea>
       <button class="runner-go" onclick="runSkill()">▶ Spustiť</button>
     </div>
     <div id="vehicle-extra" style="display:none;padding:0 20px 12px;gap:10px;flex-direction:column">
@@ -534,6 +534,11 @@ async function enterDashboard(){
 
 document.getElementById('license-input').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
 
+function autosize(el){
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 240) + 'px';
+}
+
 function showPage(id, el){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
@@ -558,8 +563,10 @@ function openRunner(skill){
   const m = SKILL_META[skill] || {icon:'⚡',title:skill,ph:'...'};
   document.getElementById('runner-title').textContent = m.icon+' '+m.title;
   document.getElementById('runner-input').placeholder = m.ph;
-  document.getElementById('runner-input').value = '';
-  document.getElementById('terminal').innerHTML = '<span class="t-dim">// Vyplňte polia a stlačte Spustiť...</span>';
+  const ri = document.getElementById('runner-input');
+  ri.value = '';
+  ri.style.height = 'auto';
+  document.getElementById('terminal').innerHTML = '<span class="t-dim">// Vyplňte polia a stlačte Spustiť. Pri viacriadkovom vstupe použite Ctrl+Enter.</span>';
   document.getElementById('runner-overlay').classList.add('open');
 
   // Show extra fields for Vehicle Doc
