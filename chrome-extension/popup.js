@@ -18,6 +18,12 @@ let COMPANY = {
 init();
 
 async function init() {
+  // Wire up event listeners (MV3 CSP blocks inline onclick)
+  document.getElementById('btn-save-license')?.addEventListener('click', saveLicense);
+  document.getElementById('btn-change-license')?.addEventListener('click', changeLicense);
+  document.getElementById('generate-btn')?.addEventListener('click', generatePDF);
+  document.getElementById('margin')?.addEventListener('input', recalcPrice);
+
   // Format license input as user types
   const li = document.getElementById('license-input');
   li.addEventListener('input', () => {
@@ -28,6 +34,9 @@ async function init() {
       out += v[i];
     }
     li.value = out;
+  });
+  li.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') saveLicense();
   });
 
   // Load saved license

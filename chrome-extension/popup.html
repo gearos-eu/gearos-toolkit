@@ -44,7 +44,7 @@ h1 span{color:#60a5fa}
   <span>Licencia:</span>
   <span class="key" id="license-key">—</span>
   <span class="tier" id="license-tier" style="display:none"></span>
-  <button class="btn-sec" style="margin-left:auto;padding:3px 8px;font-size:10px;border:none;border-radius:3px;color:#9ca3af;cursor:pointer" onclick="changeLicense()">Zmeniť</button>
+  <button id="btn-change-license" class="btn-sec" style="margin-left:auto;padding:3px 8px;font-size:10px;border:none;border-radius:3px;color:#9ca3af;cursor:pointer">Zmeniť</button>
 </div>
 
 <div id="no-license" style="display:none">
@@ -54,7 +54,7 @@ h1 span{color:#60a5fa}
       <label>Tvoj GearOS licenčný kľúč</label>
       <input id="license-input" placeholder="GEAR-XXXX-XXXX-XXXX" maxlength="19">
     </div>
-    <button class="btn" onclick="saveLicense()">Overiť a uložiť</button>
+    <button id="btn-save-license" class="btn">Overiť a uložiť</button>
     <div class="status" id="license-status"></div>
   </div>
 </div>
@@ -90,7 +90,7 @@ h1 span{color:#60a5fa}
       </div>
       <div class="field">
         <label>Marža (€)</label>
-        <input id="margin" type="number" placeholder="napr. 2500" oninput="recalcPrice()">
+        <input id="margin" type="number" placeholder="napr. 2500">
       </div>
       <div class="field">
         <label>Predajná cena pre zákazníka (€)</label>
@@ -104,7 +104,7 @@ h1 span{color:#60a5fa}
           <option value="none">Bez DPH info</option>
         </select>
       </div>
-      <button class="btn" id="generate-btn" onclick="generatePDF()">Vygenerovať PDF</button>
+      <button class="btn" id="generate-btn">Vygenerovať PDF</button>
       <div class="status" id="gen-status"></div>
     </div>
   </div>
