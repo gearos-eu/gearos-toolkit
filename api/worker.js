@@ -139,25 +139,60 @@ Vráť LEN text emailu (Betreff: + telo), žiadny iný komentár.`,
     user: (input) => `Info o dealerovi a aute ktoré ponúkam:\n\n${input}`,
   },
   'vehicle-doc-generator': {
-    system: `Si asistent autosalónu. Z popisu auta vygeneruj štruktúrovaný JSON pre PDF ponuku.
-Vráť LEN JSON, žiadny iný text.
+    system: `Si asistent slovenského autosalónu. Z popisu nemeckého auta (mobile.de) vygeneruj štruktúrovaný JSON pre PDF cenovú ponuku v slovenčine.
+Vráť LEN JSON, žiadny iný text. Žiadne markdown bloky, žiadne komentáre.
 
 KRITICKÉ PRAVIDLO:
-- Ak vstup obsahuje IBA URL (napr. https://...mobile.de/...) alebo je príliš krátky bez popisu,
-  vráť tento error JSON: {"error": "no_description", "message": "Potrebujem textový popis auta. URL z mobile.de zatial nepodporujeme — skopíruj základné údaje (značka, model, rok, km, výkon, výbava) do popisu."}
-- NIKDY si nevymýšľaj údaje (značku, model, rok, výkon, farbu, výbavu) ak nie sú v texte.
-- Ak v texte chýba dôležitý údaj, môžeš ho vynechať z JSON, ale NIKDY ho neuhádni.
+- Ak vstup obsahuje IBA URL bez popisu, vráť: {"error": "no_description", "message": "Potrebujem popis auta z mobile.de. Použi Chrome extension alebo skopíruj údaje ručne."}
+- NIKDY si nevymýšľaj údaje (značka, model, rok, výkon, farba, výbava). Použi LEN to čo je v texte.
+- Equipment je často po nemecky — prelož ho do slovenčiny prirodzene.
 
-Schema (keď je popis OK):
+NEMECKO-SLOVENSKÝ slovník (príklady, prelož aj všetko ostatné):
+- Klimaautomatik → Klimatizácia automatická
+- Sitzheizung → Vyhrievané sedadlá
+- Lederlenkrad → Kožený volant
+- LED-Scheinwerfer → LED svetlomety
+- LED-Tagfahrlicht → LED denné svietenie
+- Abstandstempomat → Adaptívny tempomat
+- Spurhalteassistent → Asistent jazdy v pruhu
+- Einparkhilfe → Parkovacie senzory
+- Rückfahrkamera → Cúvacia kamera
+- Navigationssystem → Navigácia
+- Bluetooth → Bluetooth
+- Apple CarPlay → Apple CarPlay
+- Android Auto → Android Auto
+- Lichtsensor → Svetelný senzor
+- Regensensor → Dažďový senzor
+- Berganfahrassistent → Asistent rozjazdu do kopca
+- Elektr. Sitze → Elektricky nastaviteľné sedadlá
+- Alarmanlage → Alarm
+- Wegfahrsperre → Imobilizér
+- Isofix → Isofix
+- Leichtmetallfelgen → Hliníkové disky
+- Panoramadach → Panoramatická strecha
+- Schiebedach → Posuvná strecha
+- Allradantrieb → Pohon 4×4
+- Heckantrieb → Zadný pohon
+- Frontantrieb → Predný pohon
+- Automatik → Automatická prevodovka
+- Schaltgetriebe → Manuálna prevodovka
+- Anhängerkupplung → Ťažné zariadenie
+- Dachreling → Strešné lišty
+- Ambiente-Beleuchtung → Ambientné osvetlenie
+- Multifunktionslenkrad → Multifunkčný volant
+- Bordcomputer → Palubný počítač
+
+Schema:
 {
-  "title": "Make Model — Variant (presne ako v texte)",
-  "headline_specs": ["len údaje ktoré sú v texte"],
-  "selling_points": ["3-5 krátkych viet zo skutočných údajov v texte"],
+  "title": "Značka Model — Variant (z textu)",
+  "headline_specs": ["EZ MM/YYYY", "XX 000 km", "XXX kW (XXX PS)", "Palivo SK", "Prevodovka SK"],
+  "selling_points": ["3-5 krátkych slovenských viet popisujúcich auto"],
+  "equipment_sk": ["preložené položky výbavy do slovenčiny — všetky ktoré sú v texte"],
   "price_label": "Predajná cena vrátane DPH",
   "price_value_eur": <číslo z textu>,
-  "footer_note": "krátka veta na základe údajov v texte"
+  "footer_note": "krátka slovenská veta dôveryhodnosti (napr. servisná história, bez nehody)"
 }`,
-    user: (input) => `Popis auta:\n\n${input}`,
+    user: (input) => `Popis auta z mobile.de:\n\n${input}`,
   },
 }
 

@@ -201,8 +201,12 @@ async function generatePDF() {
     // Use our price, not Claude's
     vehData.price_value_eur = price;
 
+    status.textContent = 'Sťahujem fotky...';
+    const photos = await downloadPhotos(CURRENT_LISTING.images || []);
+    console.log('[GearOS] Photos:', { hero: !!photos.hero, ext: photos.exterior.length, int: photos.interior.length });
+
     status.textContent = 'Generujem PDF...';
-    const filename = await buildPDF(vehData, vatMode);
+    const filename = await buildPDF(vehData, vatMode, photos);
     status.textContent = '✅ PDF stiahnuté: ' + filename;
     status.className = 'status ok';
   } catch (e) {
@@ -217,21 +221,64 @@ async function generatePDF() {
 function buildDescription(listing, price, vatMode) {
   const lines = [];
   lines.push(listing.title || '');
-  // Specs as key-value pairs
   for (const [k, v] of Object.entries(listing.specs || {})) {
     lines.push(`${k}: ${v}`);
   }
+  // Send ALL equipment (Claude will translate)
   if (listing.equipment && listing.equipment.length) {
-    lines.push('Výbava: ' + listing.equipment.slice(0, 20).join(', '));
+    lines.push('Výbava (po nemecky, prelož): ' + listing.equipment.join(', '));
   }
   lines.push(`Predajná cena: ${price} EUR`);
   lines.push(`DPH režim: ${vatMode === 'margin' ? '§ 25a (DPH v marži)' : vatMode === 'vat' ? 'štandardná 23%' : 'bez DPH'}`);
   return lines.join('\n');
 }
 
-async function buildPDF(v, vatMode) {
+// Download images from classistatic CDN and convert to base64 dataURLs.
+// Mobile.de gallery: first photos are usually exterior, interior comes later.
+async function downloadPhotos(urls) {
+  if (!urls || !urls.length) return { hero: null, exterior: [], interior: [] };
+
+  // Convert listing URLs (which lack rule param) to rule=mo-1024 for size balance
+  const fullUrls = urls.map(u => {
+    if (u.includes('?')) return u;
+    return u + '?rule=mo-1024';
+  });
+
+  // Take first 5 as candidate (mobile.de typically orders exterior first)
+  const candidates = fullUrls.slice(0, Math.min(8, fullUrls.length));
+
+  const results = await Promise.all(candidates.map(async (url) => {
+    try {
+      const res = await fetch(url, { credentials: 'omit' });
+      if (!res.ok) return null;
+      const blob = await res.blob();
+      return await new Promise(r => {
+        const fr = new FileReader();
+        fr.onload = () => r({ url, dataUrl: fr.result, size: blob.size });
+        fr.readAsDataURL(blob);
+      });
+    } catch (e) {
+      console.warn('[GearOS] Failed to download', url, e);
+      return null;
+    }
+  }));
+
+  const valid = results.filter(Boolean);
+  if (valid.length === 0) return { hero: null, exterior: [], interior: [] };
+
+  // Heuristic: first 3 photos = exterior, photos[5] and photos[7] = interior
+  // (mobile.de gallery convention; user can override later)
+  return {
+    hero: valid[0]?.dataUrl || null,
+    exterior: [valid[1], valid[2]].filter(Boolean).map(v => v.dataUrl),
+    interior: [valid[5], valid[7]].filter(Boolean).map(v => v.dataUrl).slice(0, 2),
+  };
+}
+
+async function buildPDF(v, vatMode, photos) {
   const today = new Date().toLocaleDateString('sk-SK');
   const price = (v.price_value_eur || 0).toLocaleString('sk-SK');
+  const equipment = v.equipment_sk || [];
 
   const headerColumns = [];
   if (DEALER_LOGO_DATAURL) {
@@ -247,40 +294,119 @@ async function buildPDF(v, vatMode) {
   if (vatMode === 'margin') vatLine = 'Cena vrátane DPH v režime prirážky podľa § 25a zákona o DPH.';
   else if (vatMode === 'vat') vatLine = 'Cena vrátane DPH 23%.';
 
-  const docDef = {
-    pageSize: 'A4',
-    pageMargins: [40, 40, 40, 50],
-    content: [
-      { columns: headerColumns, columnGap: 10 },
-      { text: DEALER_LOGO_DATAURL ? subtitle : (COMPANY.city + ' · ' + COMPANY.email + ' · ' + COMPANY.phone),
-        style: 'companyInfo', margin: [0, DEALER_LOGO_DATAURL ? 8 : 3, 0, 0] },
-      { canvas: [{ type: 'line', x1: 0, y1: 5, x2: 515, y2: 5, lineWidth: 1.2, lineColor: '#1a1a2e' }],
-        margin: [0, 10, 0, 18] },
-      { text: 'CENOVÁ PONUKA', style: 'docTitle' },
-      { text: v.title || 'Vozidlo', style: 'vehicleTitle' },
-      v.headline_specs && v.headline_specs.length ?
-        { text: v.headline_specs.join('  ·  '), style: 'specsRow', margin: [0, 6, 0, 0] } : '',
-      { text: 'PREDNOSTI VOZIDLA', style: 'sectionLabel', margin: [0, 25, 0, 8] },
-      { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 80, y2: 0, lineWidth: 1, lineColor: '#1a1a2e' }] },
-      { ul: v.selling_points || [], style: 'pointsList', margin: [0, 10, 0, 0] },
-      {
-        table: {
-          widths: ['*'],
-          body: [[{
-            stack: [
-              { text: (v.price_label || 'PREDAJNÁ CENA').toUpperCase(), style: 'priceLabel' },
-              { text: price + ' €', style: 'priceValue' },
-              vatLine ? { text: vatLine, style: 'priceNote', margin: [0, 4, 0, 0] } : '',
-            ],
-            fillColor: '#1a1a2e', color: '#ffffff',
-            border: [false, false, false, false],
-            margin: [16, 14, 16, 14],
-          }]],
+  // Reusable header block
+  const headerBlock = [
+    { columns: headerColumns, columnGap: 10 },
+    { text: DEALER_LOGO_DATAURL ? subtitle : (COMPANY.city + ' · ' + COMPANY.email + ' · ' + COMPANY.phone),
+      style: 'companyInfo', margin: [0, DEALER_LOGO_DATAURL ? 8 : 3, 0, 0] },
+    { canvas: [{ type: 'line', x1: 0, y1: 5, x2: 515, y2: 5, lineWidth: 1.2, lineColor: '#1a1a2e' }],
+      margin: [0, 10, 0, 18] },
+  ];
+
+  // Split equipment into 2 columns
+  const half = Math.ceil(equipment.length / 2);
+  const equipLeft = equipment.slice(0, half);
+  const equipRight = equipment.slice(half);
+
+  const content = [
+    // ─── PAGE 1: Cover ──────────────────────────────────────
+    ...headerBlock,
+    { text: 'CENOVÁ PONUKA', style: 'docTitle' },
+    { text: v.title || 'Vozidlo', style: 'vehicleTitle' },
+    v.headline_specs && v.headline_specs.length ?
+      { text: v.headline_specs.join('  ·  '), style: 'specsRow', margin: [0, 6, 0, 0] } : '',
+  ];
+
+  // Hero photo (if available)
+  if (photos?.hero) {
+    content.push({
+      image: photos.hero,
+      width: 515,
+      margin: [0, 18, 0, 0],
+    });
+  }
+
+  // Selling points
+  content.push(
+    { text: 'PREDNOSTI VOZIDLA', style: 'sectionLabel', margin: [0, 20, 0, 8] },
+    { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 80, y2: 0, lineWidth: 1, lineColor: '#1a1a2e' }] },
+    { ul: v.selling_points || [], style: 'pointsList', margin: [0, 10, 0, 0] },
+  );
+
+  // Price box
+  content.push({
+    table: {
+      widths: ['*'],
+      body: [[{
+        stack: [
+          { text: (v.price_label || 'PREDAJNÁ CENA').toUpperCase(), style: 'priceLabel' },
+          { text: price + ' €', style: 'priceValue' },
+          vatLine ? { text: vatLine, style: 'priceNote', margin: [0, 4, 0, 0] } : '',
+        ],
+        fillColor: '#1a1a2e', color: '#ffffff',
+        border: [false, false, false, false],
+        margin: [16, 14, 16, 14],
+      }]],
+    },
+    layout: 'noBorders',
+    margin: [0, 18, 0, 0],
+  });
+
+  // ─── PAGE 2: Equipment + interior photos ─────────────────────
+  if (equipment.length > 0 || photos?.interior?.length) {
+    content.push({ text: '', pageBreak: 'before' });
+    content.push(...headerBlock);
+
+    if (equipment.length > 0) {
+      content.push(
+        { text: 'VÝBAVA A VÝRAZNÉ PRVKY', style: 'sectionLabel', margin: [0, 0, 0, 8] },
+        { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 80, y2: 0, lineWidth: 1, lineColor: '#1a1a2e' }] },
+        {
+          columns: [
+            { ul: equipLeft, style: 'equipList' },
+            { ul: equipRight, style: 'equipList' },
+          ],
+          columnGap: 18,
+          margin: [0, 12, 0, 0],
         },
-        layout: 'noBorders',
-        margin: [0, 30, 0, 15],
-      },
-      v.footer_note ? { text: v.footer_note, style: 'footerNote', margin: [0, 14, 0, 0] } : '',
+      );
+    }
+
+    // Interior photos
+    if (photos?.interior?.length) {
+      content.push(
+        { text: 'INTERIÉR', style: 'sectionLabel', margin: [0, 22, 0, 8] },
+        { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 80, y2: 0, lineWidth: 1, lineColor: '#1a1a2e' }] },
+      );
+      const interiorRow = {
+        columns: photos.interior.map(p => ({ image: p, width: 248 })),
+        columnGap: 19,
+        margin: [0, 12, 0, 0],
+      };
+      content.push(interiorRow);
+    }
+  }
+
+  // ─── PAGE 3: Additional exterior + contact ─────────────────
+  if (photos?.exterior?.length) {
+    content.push({ text: '', pageBreak: 'before' });
+    content.push(...headerBlock);
+    content.push(
+      { text: 'EXTERIÉR', style: 'sectionLabel', margin: [0, 0, 0, 8] },
+      { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 80, y2: 0, lineWidth: 1, lineColor: '#1a1a2e' }] },
+    );
+    const exteriorRow = {
+      columns: photos.exterior.map(p => ({ image: p, width: 248 })),
+      columnGap: 19,
+      margin: [0, 12, 0, 0],
+    };
+    content.push(exteriorRow);
+
+    // Footer note + contact on page 3
+    if (v.footer_note) {
+      content.push({ text: v.footer_note, style: 'footerNote', margin: [0, 24, 0, 0] });
+    }
+    content.push(
       { text: '', margin: [0, 30, 0, 0] },
       { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 515, y2: 0, lineWidth: 0.5, lineColor: '#cccccc' }] },
       { text: 'KONTAKT', style: 'sectionLabel', margin: [0, 14, 0, 6] },
@@ -290,18 +416,39 @@ async function buildPDF(v, vatMode) {
           { text: COMPANY.email + '\n' + COMPANY.phone, style: 'contactInfo', alignment: 'right' },
         ],
       },
-    ],
+    );
+  } else {
+    // No photos — add contact at end of page 1/2
+    content.push(
+      v.footer_note ? { text: v.footer_note, style: 'footerNote', margin: [0, 18, 0, 0] } : '',
+      { text: '', margin: [0, 24, 0, 0] },
+      { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 515, y2: 0, lineWidth: 0.5, lineColor: '#cccccc' }] },
+      { text: 'KONTAKT', style: 'sectionLabel', margin: [0, 12, 0, 6] },
+      {
+        columns: [
+          { text: COMPANY.owner + '\n' + COMPANY.name, style: 'contactName' },
+          { text: COMPANY.email + '\n' + COMPANY.phone, style: 'contactInfo', alignment: 'right' },
+        ],
+      },
+    );
+  }
+
+  const docDef = {
+    pageSize: 'A4',
+    pageMargins: [40, 40, 40, 50],
+    content,
     styles: {
       companyName: { fontSize: 18, bold: true, color: '#1a1a2e' },
       companyInfo: { fontSize: 9, color: '#6b7280' },
       date: { fontSize: 10, color: '#6b7280' },
       docTitle: { fontSize: 10, color: '#6b7280', bold: true, characterSpacing: 2 },
-      vehicleTitle: { fontSize: 26, bold: true, color: '#1a1a2e', margin: [0, 4, 0, 0] },
+      vehicleTitle: { fontSize: 24, bold: true, color: '#1a1a2e', margin: [0, 4, 0, 0] },
       specsRow: { fontSize: 11, color: '#6b7280' },
       sectionLabel: { fontSize: 9, color: '#1a1a2e', bold: true, characterSpacing: 1.5 },
-      pointsList: { fontSize: 11.5, color: '#1a1a2e', lineHeight: 1.5 },
+      pointsList: { fontSize: 11, color: '#1a1a2e', lineHeight: 1.5 },
+      equipList: { fontSize: 9.5, color: '#1a1a2e', lineHeight: 1.4 },
       priceLabel: { fontSize: 10, color: '#cccccc', characterSpacing: 2 },
-      priceValue: { fontSize: 32, bold: true, color: '#ffffff', margin: [0, 4, 0, 0] },
+      priceValue: { fontSize: 30, bold: true, color: '#ffffff', margin: [0, 4, 0, 0] },
       priceNote: { fontSize: 9, color: '#cccccc', italics: true },
       footerNote: { fontSize: 10, italics: true, color: '#6b7280' },
       contactName: { fontSize: 11, bold: true, color: '#1a1a2e', lineHeight: 1.3 },
