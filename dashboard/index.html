@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>GearOS — Dealer Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.10/pdfmake.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.10/vfs_fonts.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -635,10 +637,63 @@ async function runSkill(){
 
       termLine(term, '<span class="t-dim">Odpoveď za '+ms+'ms · '+(data.usage?.input_tokens||0)+' in / '+(data.usage?.output_tokens||0)+' out tokens</span>');
       termLine(term, '');
-      termLine(term, '<span class="t-dim">──── Výsledok ──────────────────────────────</span>');
 
-      // Render output line by line s minimálnou animáciou
-      const text = data.output || '(prázdna odpoveď)';
+      const text = data.output || '';
+
+      // Vehicle Doc → generuj a stiahni PDF
+      if(currentSkill === 'vehicle-doc-generator'){
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        if(!jsonMatch){
+          termLine(term, '<span class="t-red">❌ API nevrátil JSON. Surová odpoveď:</span>');
+          termLine(term, '<span class="t-dim">'+text.substring(0,300)+'</span>');
+          return;
+        }
+        let vehData;
+        try { vehData = JSON.parse(jsonMatch[0]); }
+        catch(e){
+          termLine(term, '<span class="t-red">❌ Neplatný JSON z API: '+e.message+'</span>');
+          return;
+        }
+
+        termLine(term, '<span class="t-dim">──── Náhľad ────────────────────────────────</span>');
+        termLine(term, '<span class="t-white t-bold">'+vehData.title+'</span>');
+        (vehData.headline_specs||[]).forEach(s => termLine(term, '<span class="t-dim">  · '+s+'</span>'));
+        termLine(term, '');
+        (vehData.selling_points||[]).forEach(s => termLine(term, '<span class="t-white">✓ '+s+'</span>'));
+        termLine(term, '');
+        termLine(term, '<span class="t-accent t-bold">'+(vehData.price_label||'Cena')+': '+(vehData.price_value_eur||0).toLocaleString('sk-SK')+' €</span>');
+        termLine(term, '');
+        termLine(term, '<span class="t-dim">Generujem PDF...</span>');
+
+        const fname = generateVehiclePDF(vehData);
+        termLine(term, '<span class="t-green">✅ PDF stiahnuté: '+fname+'</span>');
+        termLine(term, '<span class="t-dim">──────────────────────────────────────────</span>');
+        return;
+      }
+
+      // Inquiry Classifier → parsuj JSON na karty
+      if(currentSkill === 'inquiry-classifier'){
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        if(jsonMatch){
+          try {
+            const c = JSON.parse(jsonMatch[0]);
+            termLine(term, '<span class="t-dim">──── Klasifikácia ──────────────────────────</span>');
+            termLine(term, '<span class="t-dim">Typ:      </span><span class="t-yellow">'+c.type+'</span>');
+            termLine(term, '<span class="t-dim">Jazyk:    </span><span class="t-white">'+c.language+'</span>');
+            termLine(term, '<span class="t-dim">Urgency:  </span><span class="t-'+(c.urgency==='high'?'red':c.urgency==='medium'?'yellow':'green')+'">'+c.urgency+'</span>');
+            termLine(term, '');
+            termLine(term, '<span class="t-dim">Zhrnutie: </span><span class="t-white">'+c.summary+'</span>');
+            termLine(term, '');
+            termLine(term, '<span class="t-dim">──── Navrhovaná odpoveď ────────────────────</span>');
+            (c.suggested_reply||'').split('\n').forEach(l => termLine(term, '<span class="t-white">'+l.replace(/</g,'&lt;')+'</span>'));
+            termLine(term, '<span class="t-dim">──────────────────────────────────────────</span>');
+            return;
+          } catch(e){}
+        }
+      }
+
+      // B2B Outreach a iné — len text
+      termLine(term, '<span class="t-dim">──── Výsledok ──────────────────────────────</span>');
       const outLines = text.split('\n');
       let i = 0;
       typeInterval = setInterval(()=>{
@@ -684,6 +739,104 @@ async function runSkill(){
 
   // Fallback (nemalo by sa stať)
   termLine(term, '<span class="t-red">Neznámy skill: '+currentSkill+'</span>');
+}
+
+function generateVehiclePDF(v){
+  const company = {
+    name: document.getElementById('cfg-name')?.value || 'AutoTest s.r.o.',
+    owner: document.getElementById('cfg-owner')?.value || 'Peter Novák',
+    email: document.getElementById('cfg-email')?.value || 'info@autotest.sk',
+    phone: '+421 900 123 456',
+    city: 'Košice, Slovensko',
+  };
+  const today = new Date().toLocaleDateString('sk-SK');
+  const price = (v.price_value_eur || 0).toLocaleString('sk-SK');
+
+  const docDef = {
+    pageSize: 'A4',
+    pageMargins: [40, 50, 40, 50],
+    content: [
+      // Header
+      {
+        columns: [
+          { text: company.name, style: 'companyName' },
+          { text: today, style: 'date', alignment: 'right' },
+        ],
+      },
+      { text: company.city + ' · ' + company.email + ' · ' + company.phone, style: 'companyInfo' },
+      { canvas: [{ type: 'line', x1: 0, y1: 5, x2: 515, y2: 5, lineWidth: 1, lineColor: '#2563eb' }], margin: [0, 10, 0, 20] },
+
+      // Title
+      { text: 'CENOVÁ PONUKA', style: 'docTitle' },
+      { text: v.title || 'Vozidlo', style: 'vehicleTitle' },
+
+      // Headline specs
+      { text: 'TECHNICKÉ ÚDAJE', style: 'sectionLabel', margin: [0, 20, 0, 6] },
+      {
+        ul: v.headline_specs || [],
+        style: 'specsList',
+      },
+
+      // Selling points
+      { text: 'PREDNOSTI VOZIDLA', style: 'sectionLabel', margin: [0, 20, 0, 6] },
+      {
+        ul: v.selling_points || [],
+        style: 'pointsList',
+      },
+
+      // Price box
+      {
+        table: {
+          widths: ['*'],
+          body: [[{
+            stack: [
+              { text: v.price_label || 'Predajná cena vrátane DPH', style: 'priceLabel' },
+              { text: price + ' €', style: 'priceValue' },
+            ],
+            fillColor: '#f1f5f9',
+            border: [false, false, false, false],
+            margin: [12, 12, 12, 12],
+          }]],
+        },
+        layout: 'noBorders',
+        margin: [0, 25, 0, 15],
+      },
+
+      // Footer note
+      v.footer_note ? { text: v.footer_note, style: 'footerNote', margin: [0, 10, 0, 0] } : '',
+
+      // Contact
+      { text: '', margin: [0, 30, 0, 0] },
+      { text: 'KONTAKT', style: 'sectionLabel', margin: [0, 0, 0, 6] },
+      {
+        columns: [
+          { text: company.owner, style: 'contactName' },
+          { text: company.email + '\n' + company.phone, style: 'contactInfo', alignment: 'right' },
+        ],
+      },
+    ],
+    styles: {
+      companyName: { fontSize: 16, bold: true, color: '#1a1a2e' },
+      companyInfo: { fontSize: 9, color: '#6b7280', margin: [0, 3, 0, 0] },
+      date: { fontSize: 10, color: '#6b7280' },
+      docTitle: { fontSize: 11, color: '#2563eb', bold: true, letterSpacing: 2, margin: [0, 0, 0, 8] },
+      vehicleTitle: { fontSize: 22, bold: true, color: '#1a1a2e', margin: [0, 0, 0, 0] },
+      sectionLabel: { fontSize: 9, color: '#2563eb', bold: true },
+      specsList: { fontSize: 11, color: '#1a1a2e', margin: [10, 0, 0, 0] },
+      pointsList: { fontSize: 11, color: '#1a1a2e', margin: [10, 0, 0, 0], lineHeight: 1.4 },
+      priceLabel: { fontSize: 10, color: '#6b7280' },
+      priceValue: { fontSize: 28, bold: true, color: '#1a1a2e', margin: [0, 4, 0, 0] },
+      footerNote: { fontSize: 10, italics: true, color: '#6b7280' },
+      contactName: { fontSize: 11, bold: true, color: '#1a1a2e' },
+      contactInfo: { fontSize: 10, color: '#6b7280' },
+    },
+    defaultStyle: { font: 'Roboto' },
+  };
+
+  const safeTitle = (v.title || 'vozidlo').replace(/[^a-zA-Z0-9]+/g, '_').substring(0, 40);
+  const filename = `ponuka_${safeTitle}_${new Date().toISOString().slice(0,10)}.pdf`;
+  pdfMake.createPdf(docDef).download(filename);
+  return filename;
 }
 
 function saveSettings(){
