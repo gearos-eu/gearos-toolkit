@@ -25,9 +25,12 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url)
 
-    // CORS for local Claude skill calls
+    // CORS for browser + Claude skill calls
     const headers = {
       'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      'Access-Control-Max-Age': '86400',
       'Content-Type': 'application/json',
     }
 
