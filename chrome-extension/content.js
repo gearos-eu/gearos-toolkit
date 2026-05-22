@@ -142,14 +142,15 @@
       .slice(0, 40);
     data.equipment = [...new Set(equip)];
 
-    // Images
+    // Images — collect all classistatic URLs, strip query string
     const imageUrls = new Set();
-    document.querySelectorAll('img[src*="classistatic"], source[srcset*="classistatic"]').forEach(el => {
-      const src = el.src || el.getAttribute('srcset') || '';
-      const matches = src.match(/classistatic\.de\/api\/v1\/mo-prod\/images\/[\w-]+\/[\w-]+/g);
-      if (matches) matches.forEach(m => imageUrls.add('https://img.' + m));
-    });
+    const imgPath = /https:\/\/[\w-]+\.classistatic\.de\/api\/v1\/mo-prod\/images\/[\w/-]+/g;
+    // Search whole DOM HTML (catches lazy-loaded data-src, srcset, srcSet, etc.)
+    const html = document.documentElement.outerHTML;
+    const matches = html.match(imgPath) || [];
+    matches.forEach(m => imageUrls.add(m));
     data.images = [...imageUrls].slice(0, 12);
+    console.log('[GearOS] Images found:', data.images.length);
 
     // VIN
     const vinMatch = (document.body.innerText || '').match(/\b[A-HJ-NPR-Z0-9]{17}\b/);
