@@ -330,6 +330,20 @@ tr:hover td{background:var(--surface2)}
         <button class="save-btn" onclick="saveSettings()">Uložiť</button>
       </div>
       <div class="settings-section">
+        <h3>🎨 Branding (logo do PDF ponúk)</h3>
+        <div class="field-row" style="align-items:flex-start">
+          <label class="field-label">Logo dealera</label>
+          <div style="flex:1">
+            <div id="logo-preview-wrap" style="display:flex;gap:14px;align-items:center;margin-bottom:10px">
+              <div id="logo-preview" style="width:120px;height:60px;background:#0f1117;border:1px solid var(--border);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--muted)">žiadne logo</div>
+              <div id="logo-status" style="font-size:12px;color:var(--muted)"></div>
+            </div>
+            <input type="file" id="logo-input" accept="image/png,image/jpeg,image/svg+xml,image/webp" style="display:none" onchange="uploadLogo(this)">
+            <button class="save-btn" style="background:var(--surface2)" onclick="document.getElementById('logo-input').click()">Vybrať súbor (PNG/JPG/SVG · max 2MB)</button>
+          </div>
+        </div>
+      </div>
+      <div class="settings-section">
         <h3>🔑 Licencia</h3>
         <div class="field-row"><label class="field-label">Kľúč</label><input class="field-input" value="GEAR-DEMO-0000-0001" style="font-family:monospace" readonly></div>
         <div class="field-row"><label class="field-label">Tier</label><input class="field-input" value="Pro" readonly></div>
@@ -350,6 +364,20 @@ tr:hover td{background:var(--surface2)}
       <input class="runner-input" id="runner-input" placeholder="Napr: BMW 3er diesel, VW Golf 2020, Škoda Octavia..." onkeydown="if(event.key==='Enter')runSkill()">
       <button class="runner-go" onclick="runSkill()">▶ Spustiť</button>
     </div>
+    <div id="vehicle-extra" style="display:none;padding:0 20px 12px;gap:10px;flex-direction:column">
+      <div style="display:flex;gap:10px;align-items:center">
+        <label style="font-size:12px;color:var(--muted);min-width:130px">Predajná cena (€)</label>
+        <input id="vehicle-price" type="number" placeholder="napr. 28900" style="flex:1;background:#0f1117;border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:6px;font-size:13px">
+      </div>
+      <div style="display:flex;gap:10px;align-items:center">
+        <label style="font-size:12px;color:var(--muted);min-width:130px">Cenový režim</label>
+        <select id="vehicle-vat" style="flex:1;background:#0f1117;border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:6px;font-size:13px">
+          <option value="margin">§ 25a — DPH v marži (ojazdené auto)</option>
+          <option value="vat">Štandardná DPH 23%</option>
+          <option value="none">Bez DPH info</option>
+        </select>
+      </div>
+    </div>
     <div class="terminal" id="terminal">
       <span class="t-dim">// Zadajte model a stlačte Spustiť...</span>
     </div>
@@ -360,6 +388,76 @@ tr:hover td{background:var(--surface2)}
 const API_BASE = 'https://gearos-license-api.rybarsky.workers.dev';
 const DEMO_KEYS = ['GEAR-DEMO-0000-0001','GEAR-TEST-0000-0002'];
 let CURRENT_LICENSE = null;
+let DEALER_LOGO_DATAURL = null;  // base64 dataURL po načítaní z Storage
+
+// Public URL pre logo dealera v Supabase Storage
+function dealerLogoUrl(license_key){
+  const base = 'https://ykkbdhfxfqrcjkmqtqlu.supabase.co/storage/v1/object/public/dealer-logos/';
+  // Skúsime PNG ako default; fallback v JS skúsi ostatné koncovky
+  return base + license_key;
+}
+
+async function loadDealerLogo(license_key){
+  if(!license_key) return null;
+  const base = 'https://ykkbdhfxfqrcjkmqtqlu.supabase.co/storage/v1/object/public/dealer-logos/';
+  for(const ext of ['png','jpg','webp','svg']){
+    try {
+      const url = base + license_key + '.' + ext;
+      const res = await fetch(url);
+      if(res.ok){
+        const blob = await res.blob();
+        return await new Promise(r => {
+          const fr = new FileReader();
+          fr.onload = () => r({dataUrl: fr.result, ext, url});
+          fr.readAsDataURL(blob);
+        });
+      }
+    } catch(e){}
+  }
+  return null;
+}
+
+async function uploadLogo(input){
+  const file = input.files[0];
+  if(!file) return;
+  if(file.size > 2 * 1024 * 1024){
+    document.getElementById('logo-status').textContent = '❌ Súbor príliš veľký (max 2MB)';
+    return;
+  }
+  if(!CURRENT_LICENSE?.key || DEMO_KEYS.includes(CURRENT_LICENSE.key)){
+    document.getElementById('logo-status').textContent = '⚠️ Demo režim — logo sa nedá nahrať, potrebuješ skutočnú licenciu';
+    return;
+  }
+  document.getElementById('logo-status').textContent = 'Nahrávam...';
+
+  const fr = new FileReader();
+  fr.onload = async () => {
+    const dataUrl = fr.result;
+    const b64 = dataUrl.split(',')[1];
+    try {
+      const res = await fetch(`${API_BASE}/logo/upload`, {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({
+          license_key: CURRENT_LICENSE.key,
+          content_type: file.type,
+          file_b64: b64,
+        }),
+      });
+      const data = await res.json();
+      if(data.ok){
+        DEALER_LOGO_DATAURL = dataUrl;
+        document.getElementById('logo-preview').innerHTML = '<img src="'+dataUrl+'" style="max-width:100%;max-height:100%;object-fit:contain">';
+        document.getElementById('logo-status').textContent = '✅ Logo uložené · pôjde do každého PDF';
+      } else {
+        document.getElementById('logo-status').textContent = '❌ ' + (data.error || 'chyba');
+      }
+    } catch(e){
+      document.getElementById('logo-status').textContent = '❌ Chyba: ' + e.message;
+    }
+  };
+  fr.readAsDataURL(file);
+}
 
 function formatKey(el){
   let v = el.value.replace(/[^A-Z0-9]/gi,'').toUpperCase().substring(0,16);
@@ -407,7 +505,7 @@ async function doLogin(){
   }
 }
 
-function enterDashboard(){
+async function enterDashboard(){
   document.getElementById('login').style.display='none';
   document.getElementById('app').style.display='flex';
   // Vyplň licenčné údaje v Settings
@@ -420,6 +518,18 @@ function enterDashboard(){
     const [y,m,d] = lic.valid_until.split('-');
     settingsInputs[2].value = `${d}.${m}.${y}`;
   }
+
+  // Async načítaj logo z Supabase Storage
+  loadDealerLogo(lic.key).then(logo => {
+    if(logo){
+      DEALER_LOGO_DATAURL = logo.dataUrl;
+      const prev = document.getElementById('logo-preview');
+      if(prev){
+        prev.innerHTML = '<img src="'+logo.dataUrl+'" style="max-width:100%;max-height:100%;object-fit:contain">';
+        document.getElementById('logo-status').textContent = '✅ Logo načítané · pôjde do každého PDF';
+      }
+    }
+  });
 }
 
 document.getElementById('license-input').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
@@ -436,7 +546,7 @@ const SKILL_META = {
   'competitor-pricing-monitor':   {icon:'📊', title:'Competitor Pricing Monitor',  ph:'Napr: BMW 320d 2023, VW Passat diesel...'},
   'b2b-outreach-generator':       {icon:'✉️', title:'B2B Outreach Generator',      ph:'Napr: Autohaus Müller, Hamburg, ponúkam VW Golf 2.0 TDI 2022, 54tkm, 16.800€'},
   'inquiry-classifier':           {icon:'📩', title:'Inquiry Classifier',          ph:'Vlož celý text dopytu od zákazníka (email/SMS/správa)...'},
-  'vehicle-doc-generator':        {icon:'📄', title:'Vehicle Doc Generator',       ph:'Napr: BMW 320d 2023, 51tkm, automatik, kožené sedadlá, predajná cena 28900€'},
+  'vehicle-doc-generator':        {icon:'📄', title:'Vehicle Doc Generator',       ph:'Popis auta: napr. BMW 320d xDrive 2023, 51tkm, automatik 8-st, koža Vernasca, navi, LED, bez nehody...'},
   'linkedin-prospector':          {icon:'💼', title:'LinkedIn Prospector',         ph:'Napr: Autohaus München, Premium Cars DE...'},
   'daily-digest':                 {icon:'📋', title:'Daily Digest',                ph:'(stlačte Spustiť pre dnešný prehľad)'},
   'contact-deduplicator':         {icon:'🧹', title:'Contact Deduplicator',        ph:'(stlačte Spustiť pre analýzu kontaktov)'},
@@ -449,8 +559,16 @@ function openRunner(skill){
   document.getElementById('runner-title').textContent = m.icon+' '+m.title;
   document.getElementById('runner-input').placeholder = m.ph;
   document.getElementById('runner-input').value = '';
-  document.getElementById('terminal').innerHTML = '<span class="t-dim">// Zadajte model a stlačte Spustiť...</span>';
+  document.getElementById('terminal').innerHTML = '<span class="t-dim">// Vyplňte polia a stlačte Spustiť...</span>';
   document.getElementById('runner-overlay').classList.add('open');
+
+  // Show extra fields for Vehicle Doc
+  const extra = document.getElementById('vehicle-extra');
+  extra.style.display = (skill === 'vehicle-doc-generator') ? 'flex' : 'none';
+  if(skill === 'vehicle-doc-generator'){
+    document.getElementById('vehicle-price').value = '';
+  }
+
   setTimeout(()=>document.getElementById('runner-input').focus(),100);
 }
 function closeRunner(){
@@ -610,7 +728,21 @@ async function runSkill(){
 
   // Real Claude API call
   if(LIVE_SKILLS.includes(currentSkill)){
-    if(!q){
+    // Pre vehicle-doc validácia povinných polí
+    let priceValue = 0;
+    let vatMode = 'margin';
+    if(currentSkill === 'vehicle-doc-generator'){
+      priceValue = parseInt(document.getElementById('vehicle-price').value || '0', 10);
+      vatMode = document.getElementById('vehicle-vat').value;
+      if(!q){
+        termLine(term, '<span class="t-red">⚠️ Zadaj popis auta hore.</span>');
+        return;
+      }
+      if(!priceValue || priceValue < 100){
+        termLine(term, '<span class="t-red">⚠️ Zadaj predajnú cenu v €.</span>');
+        return;
+      }
+    } else if(!q){
       termLine(term, '<span class="t-dim">// Zadajte vstup a stlačte Spustiť.</span>');
       return;
     }
@@ -621,10 +753,14 @@ async function runSkill(){
 
     try {
       const t0 = Date.now();
+      // Pre vehicle-doc zlúčime popis + cenu do inputu — Claude potom zoberie nami zadanú cenu
+      const inputText = currentSkill === 'vehicle-doc-generator'
+        ? `${q}\n\nPredajná cena: ${priceValue} EUR\nDPH režim: ${vatMode === 'margin' ? '§ 25a (DPH v marži)' : vatMode === 'vat' ? 'štandardná 23%' : 'bez DPH'}`
+        : q;
       const res = await fetch(`${API_BASE}/skill/${currentSkill}`, {
         method: 'POST',
         headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({input: q, license_key: CURRENT_LICENSE?.key}),
+        body: JSON.stringify({input: inputText, license_key: CURRENT_LICENSE?.key}),
       });
       const data = await res.json();
       const ms = Date.now() - t0;
@@ -665,8 +801,12 @@ async function runSkill(){
         termLine(term, '');
         termLine(term, '<span class="t-dim">Generujem PDF...</span>');
 
-        const fname = generateVehiclePDF(vehData);
+        // Vynútime predajnú cenu z formulára (nie z Claude)
+        vehData.price_value_eur = priceValue;
+
+        const fname = await generateVehiclePDF(vehData, vatMode);
         termLine(term, '<span class="t-green">✅ PDF stiahnuté: '+fname+'</span>');
+        termLine(term, '<span class="t-dim">Súbor nájdeš v Downloads/ priečinku.</span>');
         termLine(term, '<span class="t-dim">──────────────────────────────────────────</span>');
         return;
       }
@@ -741,7 +881,7 @@ async function runSkill(){
   termLine(term, '<span class="t-red">Neznámy skill: '+currentSkill+'</span>');
 }
 
-function generateVehiclePDF(v){
+async function generateVehiclePDF(v, vatMode){
   const company = {
     name: document.getElementById('cfg-name')?.value || 'AutoTest s.r.o.',
     owner: document.getElementById('cfg-owner')?.value || 'Peter Novák',
@@ -751,92 +891,125 @@ function generateVehiclePDF(v){
   };
   const today = new Date().toLocaleDateString('sk-SK');
   const price = (v.price_value_eur || 0).toLocaleString('sk-SK');
+  const logo = DEALER_LOGO_DATAURL;  // base64 PNG/JPG dataUrl
+
+  // Logo width/height fit
+  const headerColumns = [];
+  if(logo){
+    headerColumns.push({ image: logo, fit: [120, 45], margin: [0, 0, 0, 0] });
+  } else {
+    headerColumns.push({ text: company.name, style: 'companyName' });
+  }
+  headerColumns.push({ text: today, style: 'date', alignment: 'right', margin: [0, 16, 0, 0] });
+
+  // Subtitle (company info row)
+  const subtitle = [company.name, company.city, company.email, company.phone].filter(Boolean).join(' · ');
+
+  let vatLine = '';
+  if(vatMode === 'margin') vatLine = 'Cena vrátane DPH v režime prirážky podľa § 25a zákona o DPH.';
+  else if(vatMode === 'vat') vatLine = 'Cena vrátane DPH 23%.';
 
   const docDef = {
     pageSize: 'A4',
-    pageMargins: [40, 50, 40, 50],
+    pageMargins: [40, 40, 40, 50],
     content: [
-      // Header
-      {
-        columns: [
-          { text: company.name, style: 'companyName' },
-          { text: today, style: 'date', alignment: 'right' },
-        ],
-      },
-      { text: company.city + ' · ' + company.email + ' · ' + company.phone, style: 'companyInfo' },
-      { canvas: [{ type: 'line', x1: 0, y1: 5, x2: 515, y2: 5, lineWidth: 1, lineColor: '#2563eb' }], margin: [0, 10, 0, 20] },
+      // Header — logo vľavo, dátum vpravo
+      { columns: headerColumns, columnGap: 10 },
+      { text: logo ? subtitle : (company.city + ' · ' + company.email + ' · ' + company.phone),
+        style: 'companyInfo', margin: [0, logo ? 8 : 3, 0, 0] },
+      { canvas: [{ type: 'line', x1: 0, y1: 5, x2: 515, y2: 5, lineWidth: 1.2, lineColor: '#1a1a2e' }],
+        margin: [0, 10, 0, 18] },
 
-      // Title
+      // Title block
       { text: 'CENOVÁ PONUKA', style: 'docTitle' },
       { text: v.title || 'Vozidlo', style: 'vehicleTitle' },
 
-      // Headline specs
-      { text: 'TECHNICKÉ ÚDAJE', style: 'sectionLabel', margin: [0, 20, 0, 6] },
-      {
-        ul: v.headline_specs || [],
-        style: 'specsList',
-      },
+      // Headline specs row
+      v.headline_specs && v.headline_specs.length ? {
+        text: v.headline_specs.join('  ·  '),
+        style: 'specsRow',
+        margin: [0, 6, 0, 0],
+      } : '',
 
-      // Selling points
-      { text: 'PREDNOSTI VOZIDLA', style: 'sectionLabel', margin: [0, 20, 0, 6] },
+      // Section: Prednosti
+      { text: 'PREDNOSTI VOZIDLA', style: 'sectionLabel', margin: [0, 25, 0, 8] },
+      { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 80, y2: 0, lineWidth: 1, lineColor: '#1a1a2e' }] },
       {
         ul: v.selling_points || [],
         style: 'pointsList',
+        margin: [0, 10, 0, 0],
       },
 
-      // Price box
+      // Price block
       {
         table: {
           widths: ['*'],
           body: [[{
             stack: [
-              { text: v.price_label || 'Predajná cena vrátane DPH', style: 'priceLabel' },
+              { text: (v.price_label || 'PREDAJNÁ CENA').toUpperCase(), style: 'priceLabel' },
               { text: price + ' €', style: 'priceValue' },
+              vatLine ? { text: vatLine, style: 'priceNote', margin: [0, 4, 0, 0] } : '',
             ],
-            fillColor: '#f1f5f9',
+            fillColor: '#1a1a2e',
+            color: '#ffffff',
             border: [false, false, false, false],
-            margin: [12, 12, 12, 12],
+            margin: [16, 14, 16, 14],
           }]],
         },
         layout: 'noBorders',
-        margin: [0, 25, 0, 15],
+        margin: [0, 30, 0, 15],
       },
 
       // Footer note
-      v.footer_note ? { text: v.footer_note, style: 'footerNote', margin: [0, 10, 0, 0] } : '',
+      v.footer_note ? { text: v.footer_note, style: 'footerNote', margin: [0, 14, 0, 0] } : '',
 
-      // Contact
+      // Contact block at bottom
       { text: '', margin: [0, 30, 0, 0] },
-      { text: 'KONTAKT', style: 'sectionLabel', margin: [0, 0, 0, 6] },
+      { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 515, y2: 0, lineWidth: 0.5, lineColor: '#cccccc' }] },
+      { text: 'KONTAKT', style: 'sectionLabel', margin: [0, 14, 0, 6] },
       {
         columns: [
-          { text: company.owner, style: 'contactName' },
+          { text: company.owner + '\n' + company.name, style: 'contactName' },
           { text: company.email + '\n' + company.phone, style: 'contactInfo', alignment: 'right' },
         ],
       },
     ],
     styles: {
-      companyName: { fontSize: 16, bold: true, color: '#1a1a2e' },
-      companyInfo: { fontSize: 9, color: '#6b7280', margin: [0, 3, 0, 0] },
+      companyName: { fontSize: 18, bold: true, color: '#1a1a2e' },
+      companyInfo: { fontSize: 9, color: '#6b7280' },
       date: { fontSize: 10, color: '#6b7280' },
-      docTitle: { fontSize: 11, color: '#2563eb', bold: true, letterSpacing: 2, margin: [0, 0, 0, 8] },
-      vehicleTitle: { fontSize: 22, bold: true, color: '#1a1a2e', margin: [0, 0, 0, 0] },
-      sectionLabel: { fontSize: 9, color: '#2563eb', bold: true },
-      specsList: { fontSize: 11, color: '#1a1a2e', margin: [10, 0, 0, 0] },
-      pointsList: { fontSize: 11, color: '#1a1a2e', margin: [10, 0, 0, 0], lineHeight: 1.4 },
-      priceLabel: { fontSize: 10, color: '#6b7280' },
-      priceValue: { fontSize: 28, bold: true, color: '#1a1a2e', margin: [0, 4, 0, 0] },
+      docTitle: { fontSize: 10, color: '#6b7280', bold: true, characterSpacing: 2 },
+      vehicleTitle: { fontSize: 26, bold: true, color: '#1a1a2e', margin: [0, 4, 0, 0] },
+      specsRow: { fontSize: 11, color: '#6b7280' },
+      sectionLabel: { fontSize: 9, color: '#1a1a2e', bold: true, characterSpacing: 1.5 },
+      pointsList: { fontSize: 11.5, color: '#1a1a2e', lineHeight: 1.5 },
+      priceLabel: { fontSize: 10, color: '#cccccc', characterSpacing: 2 },
+      priceValue: { fontSize: 32, bold: true, color: '#ffffff', margin: [0, 4, 0, 0] },
+      priceNote: { fontSize: 9, color: '#cccccc', italics: true },
       footerNote: { fontSize: 10, italics: true, color: '#6b7280' },
-      contactName: { fontSize: 11, bold: true, color: '#1a1a2e' },
-      contactInfo: { fontSize: 10, color: '#6b7280' },
+      contactName: { fontSize: 11, bold: true, color: '#1a1a2e', lineHeight: 1.3 },
+      contactInfo: { fontSize: 10, color: '#6b7280', lineHeight: 1.3 },
     },
     defaultStyle: { font: 'Roboto' },
   };
 
   const safeTitle = (v.title || 'vozidlo').replace(/[^a-zA-Z0-9]+/g, '_').substring(0, 40);
   const filename = `ponuka_${safeTitle}_${new Date().toISOString().slice(0,10)}.pdf`;
-  pdfMake.createPdf(docDef).download(filename);
-  return filename;
+
+  // Robust download — getBlob + manual link.click() = funguje vždy
+  return new Promise((resolve) => {
+    pdfMake.createPdf(docDef).getBlob(blob => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      resolve(filename);
+    });
+  });
 }
 
 function saveSettings(){

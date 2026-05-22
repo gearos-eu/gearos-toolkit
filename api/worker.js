@@ -51,8 +51,66 @@ export default {
       return handleSkill(skillName, request, env, headers)
     }
 
+    if (request.method === 'POST' && url.pathname === '/logo/upload') {
+      return handleLogoUpload(request, env, headers)
+    }
+
     return new Response(JSON.stringify({ status: 'GearOS License API v1' }), { headers })
   }
+}
+
+// ─── LOGO UPLOAD ─────────────────────────────────────────────────────────────
+
+async function handleLogoUpload(request, env, headers) {
+  let body
+  try { body = await request.json() } catch { return json({ error: 'invalid_json' }, 400, headers) }
+
+  const { license_key, file_b64, content_type } = body
+  if (!license_key || !file_b64) {
+    return json({ error: 'missing_fields', need: ['license_key', 'file_b64'] }, 400, headers)
+  }
+  if (!license_key.match(/^GEAR-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/)) {
+    return json({ error: 'invalid_license_format' }, 400, headers)
+  }
+
+  // Validate license exists + active
+  const license = await supabaseGet(env, 'licenses', `key=eq.${license_key}&select=active`)
+  if (!license || license.length === 0 || !license[0].active) {
+    return json({ error: 'invalid_license' }, 403, headers)
+  }
+
+  // Decode base64
+  const binaryString = atob(file_b64)
+  const bytes = new Uint8Array(binaryString.length)
+  for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i)
+
+  if (bytes.length > 2 * 1024 * 1024) {
+    return json({ error: 'file_too_large', max_bytes: 2097152 }, 413, headers)
+  }
+
+  const ext = (content_type === 'image/svg+xml') ? 'svg' :
+              (content_type === 'image/jpeg')   ? 'jpg' :
+              (content_type === 'image/webp')   ? 'webp' : 'png'
+  const filename = `${license_key}.${ext}`
+
+  // Upload to Supabase Storage
+  const uploadRes = await fetch(`${env.SUPABASE_URL}/storage/v1/object/dealer-logos/${filename}`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${env.SUPABASE_SERVICE_KEY}`,
+      'Content-Type': content_type || 'image/png',
+      'x-upsert': 'true',
+    },
+    body: bytes,
+  })
+
+  if (!uploadRes.ok) {
+    const err = await uploadRes.text()
+    return json({ error: 'upload_failed', detail: err }, 500, headers)
+  }
+
+  const public_url = `${env.SUPABASE_URL}/storage/v1/object/public/dealer-logos/${filename}`
+  return json({ ok: true, url: public_url, filename }, 200, headers)
 }
 
 // ─── SKILL PROXY (Claude API) ────────────────────────────────────────────────

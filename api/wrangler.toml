@@ -1,0 +1,4 @@
+name = "gearos-license-api"
+main = "worker.js"
+compatibility_date = "2024-09-23"
+account_id = "87c2506d6dc424898e8b42c17f4723c1"
