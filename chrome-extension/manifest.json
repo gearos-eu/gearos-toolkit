@@ -6,7 +6,6 @@
   "permissions": ["storage", "activeTab", "downloads"],
   "host_permissions": [
     "https://*.mobile.de/*",
-    "https://suchen.mobile.de/*",
     "https://img.classistatic.de/*",
     "https://gearos-license-api.rybarsky.workers.dev/*",
     "https://ykkbdhfxfqrcjkmqtqlu.supabase.co/*"
@@ -22,7 +21,10 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://suchen.mobile.de/fahrzeuge/details.html*"],
+      "matches": [
+        "https://*.mobile.de/*",
+        "https://www.mobile.de/*"
+      ],
       "js": ["content.js"],
       "css": ["content.css"],
       "run_at": "document_idle"

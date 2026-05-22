@@ -1,22 +1,36 @@
 // GearOS — Content script for mobile.de listing pages
-// Injects a floating action button that scrapes the listing and triggers PDF generation.
+// Injects a floating action button. Works on any mobile.de subdomain.
 
 (function() {
   'use strict';
 
-  // ─── Wait for page to be stable ───
-  const waitForListing = setInterval(() => {
-    if (document.querySelector('dl dt') || document.querySelector('h1')) {
-      clearInterval(waitForListing);
+  // Only run on listing detail pages — but try multiple URL patterns
+  const isDetailPage = /\/fahrzeuge\/details\.html\?id=\d+|\/auto\/details\.html\?id=\d+/.test(location.href);
+
+  if (!isDetailPage) {
+    console.log('[GearOS] Nie je detail page, content script sa nespúšťa. URL:', location.href);
+    return;
+  }
+
+  console.log('[GearOS] Detail page detected. Injecting button...');
+
+  // Inject button immediately — don't wait for DOM elements
+  injectButton();
+
+  // Watch for DOM changes (mobile.de is SPA)
+  const observer = new MutationObserver(() => {
+    if (!document.getElementById('gearos-fab')) {
       injectButton();
     }
-  }, 500);
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
 
-  // Safety timeout — give up after 10s
-  setTimeout(() => clearInterval(waitForListing), 10000);
+  // Stop observing after 30s (no point watching forever)
+  setTimeout(() => observer.disconnect(), 30000);
 
   function injectButton() {
-    if (document.getElementById('gearos-fab')) return;  // already injected
+    if (document.getElementById('gearos-fab')) return;
+    if (!document.body) return;
 
     const btn = document.createElement('button');
     btn.id = 'gearos-fab';
@@ -29,6 +43,7 @@
     `;
     btn.addEventListener('click', onClick);
     document.body.appendChild(btn);
+    console.log('[GearOS] Button injected.');
   }
 
   async function onClick() {
@@ -38,25 +53,31 @@
 
     try {
       const data = scrapeListing();
-      if (!data.title) {
-        throw new Error('Nepodarilo sa extrahovať údaje z tejto stránky.');
+      console.log('[GearOS] Scraped:', data);
+
+      if (!data.title && Object.keys(data.specs).length === 0) {
+        throw new Error('Stránka ešte nie je načítaná. Počkaj 3s a skús znova.');
       }
 
-      // Send to popup via chrome.storage so popup can open with prefilled data
       await chrome.storage.local.set({ pendingListing: data });
-      btn.innerHTML = '✅ Údaje pripravené — otvor GearOS popup';
+      btn.innerHTML = '✅ Údaje uložené';
 
-      // Auto-open popup (Chrome doesn't allow this from content script — instruct user)
       setTimeout(() => {
         btn.classList.remove('loading');
-        btn.innerHTML = '🚀 Klikni GearOS ikonu v Chrome paneli →';
-      }, 1500);
+        btn.innerHTML = '🚀 Klikni ikonu GearOS hore →';
+      }, 1200);
     } catch (e) {
-      console.error('[GearOS]', e);
+      console.error('[GearOS] Error:', e);
       btn.classList.remove('loading');
       btn.innerHTML = '❌ ' + e.message;
       setTimeout(() => {
-        btn.innerHTML = '🔄 Skús znova';
+        btn.innerHTML = `
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+          </svg>
+          Skús znova
+        `;
       }, 4000);
     }
   }
@@ -75,38 +96,31 @@
       dealer: null,
     };
 
-    // Title — prefer h1, fallback to document.title (mobile.de format: "BMW 318 für 37.470 €")
+    // Title — prefer h1, fallback to document.title
     const h1 = document.querySelector('h1');
     if (h1 && h1.textContent.trim()) {
       data.title = h1.textContent.trim();
     } else {
-      // document.title: "BMW 318 für 37.470 € — Gebrauchtwagen" — vezmi časť pred "für"
       const tabTitle = document.title.split(/\s+für\s+/)[0].trim();
       if (tabTitle && tabTitle.length > 3 && tabTitle.length < 120) {
         data.title = tabTitle;
       }
     }
 
-    // Price — try multiple sources, including title parse
+    // Price — from document.title (most reliable)
     let price = null;
-    // From document.title "BMW 318 für 37.470 € — ..."
     const titleMatch = document.title.match(/für\s+([\d.,\s]+)\s*€/);
     if (titleMatch) {
       price = parseInt(titleMatch[1].replace(/[.,\s]/g, ''), 10);
     }
-    // From DOM selectors
     if (!price) {
-      const priceText =
-        document.querySelector('[data-testid="vip-price"]')?.textContent ||
-        document.querySelector('[data-testid="prime-price"]')?.textContent ||
-        document.querySelector('.price-block')?.textContent ||
-        document.querySelector('[class*="PriceLabel"]')?.textContent || '';
-      const priceMatch = priceText.replace(/\./g, '').replace(/,/g, '').match(/(\d{4,7})\s*€/);
-      if (priceMatch) price = parseInt(priceMatch[1], 10);
+      const priceEls = document.querySelectorAll('[data-testid*="price"], [class*="Price"], [class*="price"]');
+      for (const el of priceEls) {
+        const m = el.textContent.replace(/\./g, '').match(/(\d{4,7})\s*€/);
+        if (m) { price = parseInt(m[1], 10); break; }
+      }
     }
-    if (price && price > 100 && price < 1000000) {
-      data.price_eur = price;
-    }
+    if (price && price > 100 && price < 1000000) data.price_eur = price;
 
     // Spec table — dl dt/dd pattern
     const dts = [...document.querySelectorAll('dl dt')];
@@ -121,32 +135,24 @@
       }
     });
 
-    // Equipment list — small list items not in obvious nav/header
-    const equipItems = [...document.querySelectorAll('li')]
+    // Equipment
+    const equip = [...document.querySelectorAll('li')]
       .map(li => li.textContent.trim())
-      .filter(t => t.length > 3 && t.length < 80 && !t.includes('\n') && !/mobile|cookie|impressum|kontakt/i.test(t))
+      .filter(t => t.length > 3 && t.length < 80 && !t.includes('\n') && !/mobile|cookie|impressum|kontakt|datenschutz/i.test(t))
       .slice(0, 40);
-    data.equipment = [...new Set(equipItems)];
+    data.equipment = [...new Set(equip)];
 
-    // Images — from <img> srcset or <source> tags pointing to classistatic CDN
+    // Images
     const imageUrls = new Set();
     document.querySelectorAll('img[src*="classistatic"], source[srcset*="classistatic"]').forEach(el => {
       const src = el.src || el.getAttribute('srcset') || '';
-      // Take the highest-res URL
-      const matches = src.match(/https:\/\/img\.classistatic\.de\/api\/v1\/mo-prod\/images\/[\w-]+\/[\w-]+/g);
-      if (matches) matches.forEach(m => imageUrls.add(m));
+      const matches = src.match(/classistatic\.de\/api\/v1\/mo-prod\/images\/[\w-]+\/[\w-]+/g);
+      if (matches) matches.forEach(m => imageUrls.add('https://img.' + m));
     });
     data.images = [...imageUrls].slice(0, 12);
 
-    // Dealer name
-    const dealerEl = document.querySelector('[data-testid="vip-dealer-name"]') ||
-                     document.querySelector('[class*="dealer-name"]') ||
-                     document.querySelector('[class*="seller-name"]');
-    if (dealerEl) data.dealer = dealerEl.textContent.trim();
-
-    // VIN search (BMW: WBA/WBY/WBS, generic 17-char)
-    const allText = document.body.innerText || '';
-    const vinMatch = allText.match(/\b[A-HJ-NPR-Z0-9]{17}\b/);
+    // VIN
+    const vinMatch = (document.body.innerText || '').match(/\b[A-HJ-NPR-Z0-9]{17}\b/);
     if (vinMatch) data.specs['VIN'] = vinMatch[0];
 
     return data;
